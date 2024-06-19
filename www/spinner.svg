@@ -1,0 +1,6 @@
+<svg width="200" height="200" viewBox="0 0 20 20" xmlns="http://www.w3.org/2000/svg">
+  <polygon points="4.866,17.221 10.035,13.384 15.281,17.114 13.229,11.013 18.398,7.176 11.961,7.242 9.909,1.14 7.983,7.283 1.546,7.349 6.792,11.079"
+           style="fill:red;stroke:black;stroke-width:0.1">
+    <animateTransform attributeName="transform" attributeType="XML" type="rotate" from="0 10 10" to="360 10 10" dur="2s" repeatCount="indefinite"/>
+  </polygon>
+</svg>
