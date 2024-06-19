@@ -86,7 +86,8 @@ server <- function(input, output,session) {
     updateMultiInput(session, inputId = "iconpicker", selected = "Niks")
     #select last picked icon
     updateRadioGroupButtons(session, inputId =  "marker_icon", selected = tail(new_marker_icon_values,1))
-
+    
+    toggleDropdownButton("custom_icon_dropdown",session)
 
     
   })
@@ -97,18 +98,6 @@ server <- function(input, output,session) {
     all_marker_icons_values(default_icon_values)
     
   })
-  
-  
-  output$saved_custom_icons <- renderUI({
-    
-    custom_icons <- custom_marker_icons_values() %>% names()
-    
-    icon_tags <- lapply(custom_icons, HTML)
-    
-    icon_tags
-    
-  })
-  
   
   
   #### MAP IMAGE INPUT #####
@@ -402,6 +391,7 @@ server <- function(input, output,session) {
     uiOutput("icon_palette"),
     #triggers modal for selecting custom marker icons
     dropdownButton(
+      inputId = "custom_icon_dropdown",
       circle = F,
       status = "succes",
       label = "add custom icons",
@@ -409,11 +399,15 @@ server <- function(input, output,session) {
                  label = "Icoon",
                  choices = icon_html),
       
-      colourInput("kleur",label = "Color", value = "black"),
+      colourInput("kleur",
+                  label = "Color", value = "black",
+                  #palette = "limited",
+                  closeOnClick = T),
       
       actionButton("confirm_icons","Add"),
-      actionButton("clear_custom_icons","Remove all custom icns"),
-      uiOutput("saved_custom_icons")),
+      actionButton("clear_custom_icons","Remove all")
+      
+      ),
     textInput("label_marker","marker label"),
     textInput("url_marker","url"),
     textInput("url_label_marker","url Label"),
