@@ -37,9 +37,9 @@ default_marker_icons <- awesomeIconList(
   kroeg = makeAwesomeIcon(icon = "fa-solid fa-beer", markerColor = "white", iconColor = "gold", library = "fa")
 )
 
-default_icon_names <- default_marker_icons %>% names()
+default_icon_values <- default_marker_icons %>% names()
 
-default_icon_css <- lapply(default_icon_names, function(icon_name){
+default_icon_html <- lapply(default_icon_values, function(icon_name){
   
   icon =  default_marker_icons[[icon_name]]$icon
   iconColor = default_marker_icons[[icon_name]]$iconColor
@@ -48,7 +48,7 @@ default_icon_css <- lapply(default_icon_names, function(icon_name){
   
 }) %>% unlist()
 
-names(default_icon_names) <- default_icon_css
+names(default_icon_values) <- default_icon_html
 
 #Lijst van meer FA icoontjes
 fa_iconlist = readLines("fontawesome_icons.txt") 
@@ -63,7 +63,7 @@ icon_css <- glue("<i class='fa fa-{icon_html}'></i> {icon_html} ")
 names(icon_html) <- icon_css
 
 #functie om custom een mapIconList te maken
-maak_custom_mapicons <- function(icons, color){
+maak_custom_marker_icons <- function(icons, color){
   
   lapply(icons, function(icon_name){
     

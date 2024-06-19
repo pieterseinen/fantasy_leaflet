@@ -1,5 +1,8 @@
 server <- function(input, output,session) {
 
+  #TODO server & global refactoren
+  #TODO save map functie nakijken. zijn wat dingen aangepast.
+  #TODO checken of excess aan observeEvent voor iedere popupinput verwijderd kan worden
 
 # reactiveVals ------------------------------------------------------------
   
@@ -21,13 +24,11 @@ server <- function(input, output,session) {
     stringsAsFactors = FALSE
   ))
   
-  #awesomeIconList that can be appended with custom icons
-  all_marker_icons <- reactiveVal(default_marker_icons) 
-  #TODO rename this
-  custom_icons_html <- reactiveVal() #ReactiveVal that holds <icon> html
-  
-  all_icons_html <- reactiveVal(default_icon_names)
 
+  all_marker_icons <- reactiveVal(default_marker_icons)   #awesomeIconList that can be appended with custom icons
+  all_marker_icons_values <- reactiveVal(default_icon_values) # named character with <icon> html for both default & custom icons
+  custom_marker_icons_values <- reactiveVal() #named character with <icon> html for just custom icons so they can be removed easily
+  
 # marker customization -------------------------------------------------------------------
 
 #when a marker icon is selected
@@ -48,7 +49,7 @@ server <- function(input, output,session) {
     radioGroupButtons(
       inputId = "marker_icon",
       label = "Custom Icons",
-      choices = all_icons_html())
+      choices = all_marker_icons_values())
 
   })
 
@@ -56,22 +57,35 @@ server <- function(input, output,session) {
   observeEvent(input$confirm_icons,{
     req(input$iconpicker)
     
-    custom_map_icons_new <- maak_custom_mapicons(input$iconpicker,input$kleur)
+    #custom icons need to be added to AwesomIconList all__marker_icons() in order to
+    #use them in leaflet markers
     
-    combined_custom_map_icons <- do.call(c,list(all_marker_icons(),custom_map_icons_new))   
-
-    all_marker_icons(combined_custom_map_icons)
+    #create an awesomeIconList for custom markers
+    new_custom_marker_icons <- maak_custom_marker_icons(input$iconpicker,input$kleur)
     
-    custom_map_icon_css <- glue("<i class='fa fa-{input$iconpicker}' style='color: {input$kleur}'></i>")
+    #append new awesomeIconList to existing list
+    combined_marker_icons <- do.call(c,list(all_marker_icons(),new_custom_marker_icons))
     
-    custom_map_icon_picker <- paste0(input$iconpicker, input$kleur)
+    #update all_marker_icons() with complete iconlist
+    all_marker_icons(combined_marker_icons)
     
-    names(custom_map_icon_picker) <- custom_map_icon_css
-    custom_icons_html(c(custom_icons_html(), custom_map_icon_picker))
+    #custom icons need to be added to a named chararcter vector all_marker_icons_values() in order
+    #to list them in marker_icon input.
     
-    all_icons_html(c(all_icons_html(),custom_icons_html()))
+    new_marker_icon_values <- paste0(input$iconpicker, input$kleur)
     
+    new_marker_icon_html <- glue("<i class='fa fa-{input$iconpicker}' style='color: {input$kleur}'></i>")
+    
+    names(new_marker_icon_values) <- new_marker_icon_html
+    
+    custom_marker_icons_values(c(custom_marker_icons_values(), new_marker_icon_values))
+    
+    all_marker_icons_values(c(all_marker_icons_values(),custom_marker_icons_values()))
+    
+    #set picker selection to emtpy
     updateMultiInput(session, inputId = "iconpicker", selected = "Niks")
+    #select last picked icon
+    updateRadioGroupButtons(session, inputId =  "marker_icon", selected = tail(new_marker_icon_values,1))
 
 
     
@@ -79,15 +93,15 @@ server <- function(input, output,session) {
   
   observeEvent(input$clear_custom_icons,{
     
-    custom_icons_html(NULL)
-    all_icons_html(default_icon_names)
+    custom_marker_icons_values(NULL)
+    all_marker_icons_values(default_icon_values)
     
   })
   
   
   output$saved_custom_icons <- renderUI({
     
-    custom_icons <- custom_icons_html() %>% names()
+    custom_icons <- custom_marker_icons_values() %>% names()
     
     icon_tags <- lapply(custom_icons, HTML)
     
@@ -293,10 +307,10 @@ server <- function(input, output,session) {
     
     # Check that necessary variables exist in the loaded environment
     if (exists("mymap") && exists("saved_img_src") && exists("saved_markers_df") && exists("saved_img_dimensions") && 
-        exists("saved_custom_icons") && exists("saved_custom_icons_html")) {
+        exists("saved_custom_icons") && exists("saved_custom_marker_icons_values")) {
       
       #append custom_icons
-      custom_icons_html(c(custom_icons_html(),saved_custom_icons_html))
+      custom_marker_icons_values(c(custom_marker_icons_values(),saved_custom_marker_icons_values))
       all_marker_icons(c(all_marker_icons(), saved_custom_icons)) 
       
       
@@ -397,8 +411,8 @@ server <- function(input, output,session) {
       
       colourInput("kleur",label = "Color", value = "black"),
       
-      actionButton("confirm_icons","Add to custom icons"),
-      actionButton("clear_custom_icons","Remove all custom items"),
+      actionButton("confirm_icons","Add"),
+      actionButton("clear_custom_icons","Remove all custom icns"),
       uiOutput("saved_custom_icons")),
     textInput("label_marker","marker label"),
     textInput("url_marker","url"),
@@ -676,7 +690,7 @@ server <- function(input, output,session) {
 
         "
         <style> div.leaflet-popup-content {{max-width:80vh; min-width:20vw; max-height:40vh;}}</style>
-        <h1 style='word-break:break-word;'>{label}</h1>
+        <h2 style='word-break:break-word;'>{label}</h2>
         
         {url_in_popup}
         <br>
@@ -773,10 +787,10 @@ server <- function(input, output,session) {
         saved_markers_df <- markers_df()
         saved_img_dimensions <- img_dimensions()
         saved_custom_icons <- all_marker_icons()
-        saved_custom_icons_html <- custom_icons_html()
+        saved_custom_marker_icons_values <- custom_marker_icons_values()
         
         save(mymap, saved_img_src, saved_markers_df, saved_img_dimensions, 
-             saved_custom_icons, saved_custom_icons_html, file = file)
+             saved_custom_icons, saved_custom_marker_icons_values, file = file)
       }
     )
     
