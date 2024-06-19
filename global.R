@@ -13,7 +13,7 @@ library(colourpicker)
 
 
 #Default icons for iconinput
-map_icons <- awesomeIconList(
+default_marker_icons <- awesomeIconList(
   kasteel = makeAwesomeIcon(icon = "fa-solid fa-chess-rook", markerColor = "white", iconColor = "brown", library = "fa"),
   dungeon = makeAwesomeIcon(icon = "fa-solid fa-dungeon", markerColor = "white", iconColor = "brown", library = "fa"),
   boom = makeAwesomeIcon(icon = "fa-solid fa-tree", markerColor = "white", iconColor = "darkgreen", library = "fa"),
@@ -37,12 +37,12 @@ map_icons <- awesomeIconList(
   kroeg = makeAwesomeIcon(icon = "fa-solid fa-beer", markerColor = "white", iconColor = "gold", library = "fa")
 )
 
-default_icon_names <- map_icons %>% names()
+default_icon_names <- default_marker_icons %>% names()
 
 default_icon_css <- lapply(default_icon_names, function(icon_name){
   
-  icon =  map_icons[[icon_name]]$icon
-  iconColor = map_icons[[icon_name]]$iconColor
+  icon =  default_marker_icons[[icon_name]]$icon
+  iconColor = default_marker_icons[[icon_name]]$iconColor
   
   glue("<i class='fa {icon}' style='color: {iconColor}'></i>")
   
