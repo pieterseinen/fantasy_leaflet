@@ -12,8 +12,8 @@ library(shinycssloaders)
 library(colourpicker)
 
 
-#Default icons for iconinput
-map_icons <- awesomeIconList(
+#Default aweseomeIconlist for iconinput
+default_marker_icons <- awesomeIconList(
   kasteel = makeAwesomeIcon(icon = "fa-solid fa-chess-rook", markerColor = "white", iconColor = "brown", library = "fa"),
   dungeon = makeAwesomeIcon(icon = "fa-solid fa-dungeon", markerColor = "white", iconColor = "brown", library = "fa"),
   boom = makeAwesomeIcon(icon = "fa-solid fa-tree", markerColor = "white", iconColor = "darkgreen", library = "fa"),
@@ -37,20 +37,22 @@ map_icons <- awesomeIconList(
   kroeg = makeAwesomeIcon(icon = "fa-solid fa-beer", markerColor = "white", iconColor = "gold", library = "fa")
 )
 
-default_icon_names <- map_icons %>% names()
+#get al values/names from default iconlist
+default_icon_values <- default_marker_icons %>% names()
 
-default_icon_css <- lapply(default_icon_names, function(icon_name){
+#make html str for icon input
+default_icon_html <- lapply(default_icon_values, function(icon_name){
   
-  icon =  map_icons[[icon_name]]$icon
-  iconColor = map_icons[[icon_name]]$iconColor
+  icon = default_marker_icons[[icon_name]]$icon
+  iconColor = default_marker_icons[[icon_name]]$iconColor
   
   glue("<i class='fa {icon}' style='color: {iconColor}'></i>")
   
 }) %>% unlist()
 
-names(default_icon_names) <- default_icon_css
+names(default_icon_values) <- default_icon_html
 
-#Lijst van meer FA icoontjes
+#get more fa icons for custom icon input
 fa_iconlist = readLines("fontawesome_icons.txt") 
 
 icon_names <- fa_iconlist %>% 
@@ -62,8 +64,10 @@ icon_css <- glue("<i class='fa fa-{icon_html}'></i> {icon_html} ")
 
 names(icon_html) <- icon_css
 
-#functie om custom een mapIconList te maken
-maak_custom_mapicons <- function(icons, color){
+
+#function that makes an AwesomeIconlist based in icon & color input
+#so custom icons can be used as markers
+maak_custom_marker_icons <- function(icons, color){
   
   lapply(icons, function(icon_name){
     
@@ -79,24 +83,59 @@ maak_custom_mapicons <- function(icons, color){
   
 }
 
+#js that adds an image to the leaflet map and maintains aspect ratio
+#by calculation image bounds based in input image dimensions w correction for curvature of the earth.
+js_leaflet_background_image <- function(image_src,image_dimensions){
 
-# maak_custom_mapicon_html <- function(icons, color){
-#   lapply
-#   
-# }
-
-#JS om hoogte leaflet max. scherm in te laten nemen
-#https://stackoverflow.com/questions/61341817/making-leaflet-map-fullscreen-in-rshiny
-js <- '
-$(document).on("shiny:connected", function(){
-  $("#map").css({
-    width: window.innerWidth, 
-    height: window.innerHeight
-  });
-  $(window).on("resize", function(e){
-    if(e.target instanceof Window){
-      $("#map").css({width: window.innerWidth, height: window.innerHeight});
-    }
-  });
-})
-'
+glue::glue("
+          
+          function(el, x) {{
+            
+          var myMap = this;
+          var imageUrl = '{image_src}';
+          
+          // Get image dimensions from R
+          var imgDimensions = [{image_dimensions[2]}, {image_dimensions[1]}];
+          
+          // Calculate aspect ratio (width / height)
+          var aspectRatio = imgDimensions[0] / imgDimensions[1];
+          
+          // Define the initial bounds
+          var latMin = 40;
+          var latMax = 50;
+          var lngMin = -5;
+          var lngMax = 5;
+  
+          // Calculate the center point
+          var latCenter = (latMin + latMax) / 2;
+          var lngCenter = (lngMin + lngMax) / 2;
+  
+          // Calculate the current bounds ranges
+          var latRange = latMax - latMin;
+          var lngRange = lngMax - lngMin;
+  
+          // Calculate the distance and correction factor for longitude
+          var correctionFactor = Math.cos(latCenter * Math.PI / 180);
+  
+          // Adjust the bounds to maintain the aspect ratio
+          if (latRange / (lngRange * correctionFactor) > aspectRatio) {{
+              // Adjust the longitude range to maintain the aspect ratio
+              var newLngRange = latRange / aspectRatio;
+              lngMin = lngCenter - (newLngRange / 2) / correctionFactor;
+              lngMax = lngCenter + (newLngRange / 2) / correctionFactor;
+          }} else {{
+              // Adjust the latitude range to maintain the aspect ratio
+              var newLatRange = lngRange * aspectRatio * correctionFactor;
+              latMin = latCenter - (newLatRange / 2);
+              latMax = latCenter + (newLatRange / 2);
+          }}
+  
+          var imageBounds = [[latMin, lngMin], [latMax, lngMax]];
+  
+          // Add the image overlay
+          L.imageOverlay(imageUrl, imageBounds).addTo(myMap);
+          
+          // Adjust the map view to fit the image bounds
+          myMap.fitBounds(imageBounds);
+          }}")
+}

@@ -1,34 +1,41 @@
-
-#### Define UI
 ui <- dashboardPage(
-  # Somewhere in UI
-
+  
   dashboardHeader(
+    title = "Fantasy Map"), #end of header
 
-    title = "Fantasy Map"),
-  # Sidebar layout with input and output definitions 
   dashboardSidebar(
+    #triggers modal for entering background image url
     actionButton("open_img_input","New background image URL"),
-    actionButton("custom_icons","Custom Icons"),
-
-    #schrijf_kaart_weg
-    actionButton("opslaan","Save as Rdata"),
+    
+    #triggers modal for saving map as .Rdata
+    actionButton("save","Save as Rdata"),
+    
+    #triggers modal for exporting map as .html
     actionButton("export","Export map as html"),
     
-    #laad kaart
-    fileInput("map_file", "Load saved map from Rdata",
-              accept = ".Rdata"),
+    #fileinput for loading map from Rdata
+    fileInput("map_file", "Load saved map from Rdata",accept = ".Rdata"),
     
+    #github link 
+    #TODO mooi maken
+    HTML("<a href = 'https://github.com/pieterseinen/fantasy_leaflet'>
+    <h1 width = '90%'> Github </h1>
+         </a><br>"),
+    
+    #buymeacoffee link
     HTML(
-      '<a href="https://www.buymeacoffee.com/pieterseinen">
-      <img src="https://img.buymeacoffee.com/button-api/?text=Buy me a coffee&emoji=&slug=pieterseinen&button_colour=FFDD00&font_colour=000000&font_family=Cookie&outline_colour=000000&coffee_colour=ffffff"
-      width = "90%"
+      "<a href='https://www.buymeacoffee.com/pieterseinen'>
+      <img src='https://img.buymeacoffee.com/button-api/?text=
+      Buy me a coffee&emoji=&slug=pieterseinen&button_colour=FFDD00&font_colour=000000&font_family=Cookie&outline_colour=000000&coffee_colour=ffffff'
+      width = '90%'
       />
-      </a>')),
+      </a>"
+      )
+    ), #end of sidebar
   
-  # Main panel for displaying outputs 
   dashboardBody(
     shinyjs::useShinyjs(),
+    #TODO move to .css file
     tags$style(
       "
       #edit{
@@ -43,10 +50,9 @@ ui <- dashboardPage(
       position: relative;
       }
       "
-      
-    ),
+      ),
     
-    
+    #TODO move to .js file? 
     tags$script(HTML("
     $(document).on('change', '#image_url', function() {
       var imgUrl = $(this).val();
@@ -59,10 +65,10 @@ ui <- dashboardPage(
         img.src = imgUrl;
       }
     });
-  ")),
-
+    ")),
+    
+    #leafletmap output
     leafletOutput("mymap", width = "100%", height = "100vh") %>%
       withSpinner(image = "spinner.svg")
-      
-  ),
-)
+    ),#end of body
+)#end of ui
