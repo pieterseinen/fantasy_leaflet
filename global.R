@@ -12,7 +12,7 @@ library(shinycssloaders)
 library(colourpicker)
 
 
-#Default icons for iconinput
+#Default aweseomeIconlist for iconinput
 default_marker_icons <- awesomeIconList(
   kasteel = makeAwesomeIcon(icon = "fa-solid fa-chess-rook", markerColor = "white", iconColor = "brown", library = "fa"),
   dungeon = makeAwesomeIcon(icon = "fa-solid fa-dungeon", markerColor = "white", iconColor = "brown", library = "fa"),
@@ -37,11 +37,13 @@ default_marker_icons <- awesomeIconList(
   kroeg = makeAwesomeIcon(icon = "fa-solid fa-beer", markerColor = "white", iconColor = "gold", library = "fa")
 )
 
+#get al values/names from default iconlist
 default_icon_values <- default_marker_icons %>% names()
 
+#make html str for icon input
 default_icon_html <- lapply(default_icon_values, function(icon_name){
   
-  icon =  default_marker_icons[[icon_name]]$icon
+  icon = default_marker_icons[[icon_name]]$icon
   iconColor = default_marker_icons[[icon_name]]$iconColor
   
   glue("<i class='fa {icon}' style='color: {iconColor}'></i>")
@@ -50,7 +52,7 @@ default_icon_html <- lapply(default_icon_values, function(icon_name){
 
 names(default_icon_values) <- default_icon_html
 
-#Lijst van meer FA icoontjes
+#get more fa icons for custom icon input
 fa_iconlist = readLines("fontawesome_icons.txt") 
 
 icon_names <- fa_iconlist %>% 
@@ -62,7 +64,9 @@ icon_css <- glue("<i class='fa fa-{icon_html}'></i> {icon_html} ")
 
 names(icon_html) <- icon_css
 
-#functie om custom een mapIconList te maken
+
+#function that makes an AwesomeIconlist based in icon & color input
+#so custom icons can be used as markers
 maak_custom_marker_icons <- function(icons, color){
   
   lapply(icons, function(icon_name){
@@ -79,29 +83,8 @@ maak_custom_marker_icons <- function(icons, color){
   
 }
 
-
-# maak_custom_mapicon_html <- function(icons, color){
-#   lapply
-#   
-# }
-
-#JS om hoogte leaflet max. scherm in te laten nemen
-#https://stackoverflow.com/questions/61341817/making-leaflet-map-fullscreen-in-rshiny
-js <- '
-$(document).on("shiny:connected", function(){
-  $("#map").css({
-    width: window.innerWidth, 
-    height: window.innerHeight
-  });
-  $(window).on("resize", function(e){
-    if(e.target instanceof Window){
-      $("#map").css({width: window.innerWidth, height: window.innerHeight});
-    }
-  });
-})
-'
-#Javascript that adds an image to the leaflet map. It maintains aspect ratio
-#of the input image by adjusting the image bounds in the map to the image dimensions w correction for curvature of the earth.
+#js that adds an image to the leaflet map and maintains aspect ratio
+#by calculation image bounds based in input image dimensions w correction for curvature of the earth.
 js_leaflet_background_image <- function(image_src,image_dimensions){
 
 glue::glue("

@@ -8,14 +8,14 @@ ui <- dashboardPage(
     actionButton("open_img_input","New background image URL"),
     
     #triggers modal for saving map as .Rdata
-    actionButton("opslaan","Save as Rdata"),
+    actionButton("save","Save as Rdata"),
     
     #triggers modal for exporting map as .html
     actionButton("export","Export map as html"),
     
     #fileinput for loading map from Rdata
     fileInput("map_file", "Load saved map from Rdata",accept = ".Rdata"),
-    
+    #TODO include github link
     #buymeacoffee link
     HTML(
       '<a href="https://www.buymeacoffee.com/pieterseinen">
