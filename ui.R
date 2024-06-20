@@ -8,7 +8,7 @@ ui <- dashboardPage(
     actionButton("open_img_input","New background image URL"),
     
     #triggers modal for saving map as .Rdata
-    actionButton("opslaan","Save as Rdata"),
+    actionButton("save","Save as Rdata"),
     
     #triggers modal for exporting map as .html
     actionButton("export","Export map as html"),
@@ -16,14 +16,20 @@ ui <- dashboardPage(
     #fileinput for loading map from Rdata
     fileInput("map_file", "Load saved map from Rdata",accept = ".Rdata"),
     
+    #github link 
+    #TODO mooi maken
+    HTML("<a href = 'https://github.com/pieterseinen/fantasy_leaflet'>
+    <h1 width = '90%'> Github </h1>
+         </a><br>"),
+    
     #buymeacoffee link
     HTML(
-      '<a href="https://www.buymeacoffee.com/pieterseinen">
-      <img src="https://img.buymeacoffee.com/button-api/?text=
-      Buy me a coffee&emoji=&slug=pieterseinen&button_colour=FFDD00&font_colour=000000&font_family=Cookie&outline_colour=000000&coffee_colour=ffffff"
-      width = "90%"
+      "<a href='https://www.buymeacoffee.com/pieterseinen'>
+      <img src='https://img.buymeacoffee.com/button-api/?text=
+      Buy me a coffee&emoji=&slug=pieterseinen&button_colour=FFDD00&font_colour=000000&font_family=Cookie&outline_colour=000000&coffee_colour=ffffff'
+      width = '90%'
       />
-      </a>'
+      </a>"
       )
     ), #end of sidebar
   
