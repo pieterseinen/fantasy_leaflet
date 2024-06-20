@@ -100,3 +100,59 @@ $(document).on("shiny:connected", function(){
   });
 })
 '
+#Javascript that adds an image to the leaflet map. It maintains aspect ratio
+#of the input image by adjusting the image bounds in the map to the image dimensions w correction for curvature of the earth.
+js_leaflet_background_image <- function(image_src,image_dimensions){
+
+glue::glue("
+          
+          function(el, x) {{
+            
+          var myMap = this;
+          var imageUrl = '{image_src}';
+          
+          // Get image dimensions from R
+          var imgDimensions = [{image_dimensions[2]}, {image_dimensions[1]}];
+          
+          // Calculate aspect ratio (width / height)
+          var aspectRatio = imgDimensions[0] / imgDimensions[1];
+          
+          // Define the initial bounds
+          var latMin = 40;
+          var latMax = 50;
+          var lngMin = -5;
+          var lngMax = 5;
+  
+          // Calculate the center point
+          var latCenter = (latMin + latMax) / 2;
+          var lngCenter = (lngMin + lngMax) / 2;
+  
+          // Calculate the current bounds ranges
+          var latRange = latMax - latMin;
+          var lngRange = lngMax - lngMin;
+  
+          // Calculate the distance and correction factor for longitude
+          var correctionFactor = Math.cos(latCenter * Math.PI / 180);
+  
+          // Adjust the bounds to maintain the aspect ratio
+          if (latRange / (lngRange * correctionFactor) > aspectRatio) {{
+              // Adjust the longitude range to maintain the aspect ratio
+              var newLngRange = latRange / aspectRatio;
+              lngMin = lngCenter - (newLngRange / 2) / correctionFactor;
+              lngMax = lngCenter + (newLngRange / 2) / correctionFactor;
+          }} else {{
+              // Adjust the latitude range to maintain the aspect ratio
+              var newLatRange = lngRange * aspectRatio * correctionFactor;
+              latMin = latCenter - (newLatRange / 2);
+              latMax = latCenter + (newLatRange / 2);
+          }}
+  
+          var imageBounds = [[latMin, lngMin], [latMax, lngMax]];
+  
+          // Add the image overlay
+          L.imageOverlay(imageUrl, imageBounds).addTo(myMap);
+          
+          // Adjust the map view to fit the image bounds
+          myMap.fitBounds(imageBounds);
+          }}")
+}

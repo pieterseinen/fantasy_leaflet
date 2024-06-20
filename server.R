@@ -1,9 +1,5 @@
 server <- function(input, output,session) {
 
-  #TODO server & global refactoren
-  #TODO save map functie nakijken. zijn wat dingen aangepast.
-  #TODO checken of excess aan observeEvent voor iedere popupinput verwijderd kan worden
-
 # reactiveVals ------------------------------------------------------------
   
   #leaflet map object for saving to Rdata 
@@ -30,19 +26,124 @@ server <- function(input, output,session) {
   all_marker_icons_values <- reactiveVal(default_icon_values) # named character with <icon> html for both default & custom icons
   custom_marker_icons_values <- reactiveVal() #named character with <icon> html for just custom icons so they can be removed easily
   
-# marker customization -------------------------------------------------------------------
-
-  #when a marker icon is selected
-  #TODO verwijderen en alles in 1x laten confirmen door confirm_marker 
-  observeEvent(input$marker_icon,{
-    if(!is.null(target_marker_coords())){
+# background image inputs --------------------------------------------------------------
+  
+  # Reactive values to store the url, name and dimensions of the uploaded image
+  img_src <- reactiveVal() # Image URL
+  img_name <- reactiveVal() # Name of the image
+  img_dimensions <- reactiveVal(NULL) # Image dimensions
+  
+  
+  #modal dialog with textinput for image url
+  img_input <-  modalDialog(
+    #TODO add upload file button
+    textInput("image_url","Paste an image url"),
+    uiOutput("confirm_img_url") %>% withSpinner(color = "blue")
+    
+  )
+  
+  #show img_input modal on startup
+  session$onFlushed(function() {
+    
+    isolate({
+      showModal(img_input)
+    })
+  })
+  
+  #show img_input modal when actionbutton is clicked
+  observeEvent(input$open_img_input,{
+    showModal(img_input)
+  })
+  
+  #output with confirm button. should only show confirm when the correct filetype
+  #is entered in image_url and the image_dimensions are retrieved from client.
+  output$confirm_img_url <- renderUI({
+    req(input$image_url)
+    if(!str_extract(input$image_url,"\\.[a-zA-Z0-9]+$") %in% c(".png",".jpeg",".jpg",".gif",".bmp",".svg")){
       
-      #write the icon to the target marker
-        new_df_markers <- df_markers()
-        new_df_markers$icon[new_df_markers$group == target_marker_group()] <- input$marker_icon
-        df_markers(new_df_markers)
+      HTML(
+        "<p>Not a valid URL; enter an url with one of the following file extensions</p>
+        <li> png </li>
+        <li> jpeg </li>
+        <li> jpg </li>
+        <li> gif </li>
+        <li> bmp </li>
+        <li> svg </li>"
+      )
+    } else if(is.null(img_dimensions())){
+      
+      HTML("<p>Getting image dimensions ...  <img src = 'spinner.svg' width = '10%'></p>")
+      
+    } else{
+      actionButton("confirm_img_url","Confirm")
+    }
+  })
+  
+  #when image dimensions are retrieved from client; set image_dimensions()
+  observeEvent(input$image_url,{
+    req(input$img_dimensions)
+    img_dimensions(input$img_dimensions)
+    
+  })
+  
+  #observe changes in the image_url input and update img values
+  observe({
+    req(input$image_url)
+    img_src(input$image_url)
+    img_name(str_extract(input$image_url, "[^/]*(?=\\.[:alpha:]*$)")) #last part of url between "/" and .filetype
+    img_dimensions(input$img_dimensions) # Assuming this comes from JavaScript
+  })
+  
+  #when image url is confirmed
+  observeEvent(input$confirm_img_url,{
+    req(img_dimensions())
+    
+    removeModal() #remove image url input modal
+    
+    #clear saved map & marker values
+    map_reactive(NULL)
+    df_markers(data.frame(
+      group = character(),
+      lng = numeric(),
+      lat = numeric(),
+      label = character(),
+      icon = character(),
+      content = character(),
+      url = character(),
+      url_label = character(),
+      popup_image_url = character(),
+      popup_image_url_label = character(),
+      popup = character(),
+      stringsAsFactors = FALSE
+    ))
+    
+    #render leafletmap
+    output$mymap <- renderLeaflet({
+      
+      if(!is.null(img_dimensions())){
+        
+        image_dimensions <- isolate(img_dimensions())
+        image_src <- isolate(img_src())
+        
+        mymap = leaflet() %>%
+          # addTiles() %>% 
+          setView(lng = 0, lat = 45, zoom = 8) %>%  # initial view; scaled to img_bounds
+          
+          #js function that gets image dimensions from the client and converts these to
+          #image bounds for the leaflet map.
+          htmlwidgets::onRender(js_leaflet_background_image(image_src, image_dimensions))
+        
+        map_reactive(mymap)
+        mymap
       }
     })
+    
+  })
+
+# marker customization -------------------------------------------------------------------
+
+
+# icon customization ------------------------------------------------------
 
   #ui output for selecting marker icons
   output$icon_palette <- renderUI({
@@ -99,178 +200,12 @@ server <- function(input, output,session) {
     custom_marker_icons_values(NULL)
     all_marker_icons_values(default_icon_values) #set to default
     
-    #TODO remove icons from awesomeIconList as well.
-    
-  })
-  
-
-# map inputs --------------------------------------------------------------
-
-  #modal dialog with textinput for image url
-  img_input <-  modalDialog(
-        textInput("image_url","Paste an image url"),
-        uiOutput("url_confirm") %>% withSpinner(color = "blue")
-        )
-
-  #show img_input modal on startup
-  session$onFlushed(function() {
-    
-    isolate({
-      showModal(img_input)
-    })
-  })
-  
-  #show img_input modal when actionbutton is clicked
-  observeEvent(input$open_img_input,{
-    showModal(img_input)
-  })
-  
-  #output with confirm button. should only show confirm when the correct filetype
-  #is entered in image_url and the image_dimensions are retrieved from client.
-  output$url_confirm <- renderUI({
-    req(input$image_url)
-    if(!str_extract(input$image_url,"\\.[a-zA-Z0-9]+$") %in% c(".png",".jpeg",".jpg",".gif",".bmp",".svg")){
-      
-      HTML(
-        "<p>Not a valid URL; enter an url with one of the following file extensions</p>
-        <li> png </li>
-        <li> jpeg </li>
-        <li> jpg </li>
-        <li> gif </li>
-        <li> bmp </li>
-        <li> svg </li>"
-        )
-    } else if(is.null(img_dimensions())){
-
-      HTML("<p>Getting image dimensions ...  <img src = 'spinner.svg' width = '10%'></p>")
-
-    } else{
-      actionButton("url_confirm","Confirm")
-    }
-  })
-
-  #when image dimensions are retrieved from client; set image_dimensions()
-  observeEvent(input$image_url,{
-    req(input$img_dimensions)
-    img_dimensions(input$img_dimensions)
-    
-  })
-  
-
-  # Reactive values to store the url, name and dimensions of the uploaded image
-  img_src <- reactiveVal() # Image URL
-  img_name <- reactiveVal() # Name of the image
-  img_dimensions <- reactiveVal(NULL) # Image dimensions
-  
-  #observe changes in the image_url input and update img values
-  observe({
-    req(input$image_url)
-    img_src(input$image_url)
-    img_name(str_extract(input$image_url, "[^/]*(?=\\.[:alpha:]*$)")) #last part of url between "/" and .filetype
-    img_dimensions(input$img_dimensions) # Assuming this comes from JavaScript
-  })
-  
-  #TODO rename URL Confirm
-  #TODO Ergens wordt er NIET een popup variabele aangemaakt; dat moet wel
-  #when an image url is confirmed
-  observeEvent(input$url_confirm,{
-    req(img_dimensions())
-    
-    removeModal() #remove image url input modal
-
-    #clear saved map & marker values
-    map_reactive(NULL)
-    df_markers(data.frame(
-      group = character(),
-      lng = numeric(),
-      lat = numeric(),
-      label = character(),
-      icon = character(),
-      content = character(),
-      url = character(),
-      url_label = character(),
-      popup_image_url = character(),
-      popup_image_url_label = character(),
-      popup = character(),
-      stringsAsFactors = FALSE
-    ))
-
-    #render leafletmap
-    output$mymap <- renderLeaflet({
-      
-      if(!is.null(img_dimensions())){
-        
-        image_dimensions <- isolate(img_dimensions())
-        image_src <- isolate(img_src())
-        
-        mymap = leaflet() %>%
-          # addTiles() %>% 
-          setView(lng = 0, lat = 45, zoom = 8) %>%  # initial view; scaled to img_bounds
-          
-          #js function that gets image dimensions from the client and converts these to
-          #image bounds for the leaflet map. Correctfactor for curvature of the earth so image the isnt stretched
-          htmlwidgets::onRender(glue::glue("
-          
-          function(el, x) {{
-            
-          var myMap = this;
-          var imageUrl = '{image_src}';
-          
-          // Get image dimensions from R
-          var imgDimensions = [{image_dimensions[2]}, {image_dimensions[1]}];
-          
-          // Calculate aspect ratio (width / height)
-          var aspectRatio = imgDimensions[0] / imgDimensions[1];
-          
-          // Define the initial bounds
-          var latMin = 40;
-          var latMax = 50;
-          var lngMin = -5;
-          var lngMax = 5;
-  
-          // Calculate the center point
-          var latCenter = (latMin + latMax) / 2;
-          var lngCenter = (lngMin + lngMax) / 2;
-  
-          // Calculate the current bounds ranges
-          var latRange = latMax - latMin;
-          var lngRange = lngMax - lngMin;
-  
-          // Calculate the distance and correction factor for longitude
-          var correctionFactor = Math.cos(latCenter * Math.PI / 180);
-  
-          // Adjust the bounds to maintain the aspect ratio
-          if (latRange / (lngRange * correctionFactor) > aspectRatio) {{
-              // Adjust the longitude range to maintain the aspect ratio
-              var newLngRange = latRange / aspectRatio;
-              lngMin = lngCenter - (newLngRange / 2) / correctionFactor;
-              lngMax = lngCenter + (newLngRange / 2) / correctionFactor;
-          }} else {{
-              // Adjust the latitude range to maintain the aspect ratio
-              var newLatRange = lngRange * aspectRatio * correctionFactor;
-              latMin = latCenter - (newLatRange / 2);
-              latMax = latCenter + (newLatRange / 2);
-          }}
-  
-          var imageBounds = [[latMin, lngMin], [latMax, lngMax]];
-  
-          // Add the image overlay
-          L.imageOverlay(imageUrl, imageBounds).addTo(myMap);
-          
-          // Adjust the map view to fit the image bounds
-          myMap.fitBounds(imageBounds);
-          }}"))
-        
-        map_reactive(mymap)
-        mymap
-      }
-    })
+    #TODO optional remove icons from awesomeIconList as well as they wont be used anymore. Not removing them doesn't really impact UX. 
     
   })
   
 
 
-  
   ##### MARKERS ####
   marker_inputs <- modalDialog(
     uiOutput("icon_palette"),
@@ -450,14 +385,13 @@ server <- function(input, output,session) {
   target_marker_coords <- reactiveVal()
   target_marker_group <- reactiveVal()
 
-
   #Als er een wijziging van markers doorgevoerd wordt
   observeEvent(input$confirm_marker_inputs,{
                       
     removeModal() #remove marker input modal
                       
     if(!is.null(target_marker_coords())){
-      
+        
       new_df_markers <- df_markers() 
 
       #get df row for selected marker
@@ -716,44 +650,7 @@ server <- function(input, output,session) {
         leaflet() %>%
           setView(lng = 0, lat = 45, zoom = 8) %>% #initial view
           #js to add image to map without stretching it 
-          htmlwidgets::onRender(glue::glue("
-          function(el, x) {{
-              var myMap = this;
-              var imageUrl = '{saved_img_src}';
-              
-              var imgDimensions = [{saved_img_dimensions[2]}, {saved_img_dimensions[1]}];
-              
-              var aspectRatio = imgDimensions[0] / imgDimensions[1];
-              
-              var latMin = 40;
-              var latMax = 50;
-              var lngMin = -5;
-              var lngMax = 5;
-
-              var latCenter = (latMin + latMax) / 2;
-              var lngCenter = (lngMin + lngMax) / 2;
-
-              var latRange = latMax - latMin;
-              var lngRange = lngMax - lngMin;
-
-              var correctionFactor = Math.cos(latCenter * Math.PI / 180);
-
-              if (latRange / (lngRange * correctionFactor) > aspectRatio) {{
-                  var newLngRange = latRange / aspectRatio;
-                  lngMin = lngCenter - (newLngRange / 2) / correctionFactor;
-                  lngMax = lngCenter + (newLngRange / 2) / correctionFactor;
-              }} else {{
-                  var newLatRange = lngRange * aspectRatio * correctionFactor;
-                  latMin = latCenter - (newLatRange / 2);
-                  latMax = latCenter + (newLatRange / 2);
-              }}
-
-              var imageBounds = [[latMin, lngMin], [latMax, lngMax]];
-
-              L.imageOverlay(imageUrl, imageBounds).addTo(myMap);
-              myMap.fitBounds(imageBounds);
-          }}
-          "))
+          htmlwidgets::onRender(js_leaflet_background_image(img_src(), img_dimensions()))
       })
       
       # Use leafletProxy to add markers from the loaded data
