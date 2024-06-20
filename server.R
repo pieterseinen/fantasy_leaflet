@@ -10,7 +10,7 @@ server <- function(input, output,session) {
   map_reactive <- reactiveVal()
   
   #reactiveVal df to save marker data
-  markers_df <- reactiveVal(data.frame(
+  df_markers <- reactiveVal(data.frame(
     group = character(),
     lng = numeric(),
     lat = numeric(),
@@ -21,6 +21,7 @@ server <- function(input, output,session) {
     url_label = character(),
     popup_image_url = character(),
     popup_image_url_label = character(),
+    popup = character(),
     stringsAsFactors = FALSE
   ))
   
@@ -31,19 +32,19 @@ server <- function(input, output,session) {
   
 # marker customization -------------------------------------------------------------------
 
-#when a marker icon is selected
+  #when a marker icon is selected
   #TODO verwijderen en alles in 1x laten confirmen door confirm_marker 
   observeEvent(input$marker_icon,{
     if(!is.null(target_marker_coords())){
       
       #write the icon to the target marker
-        markers_df_new <- markers_df()
-        markers_df_new$icon[markers_df_new$group == target_marker_group()] <- input$marker_icon
-        markers_df(markers_df_new)
+        new_df_markers <- df_markers()
+        new_df_markers$icon[new_df_markers$group == target_marker_group()] <- input$marker_icon
+        df_markers(new_df_markers)
       }
     })
 
-#ui output for selecting marker icons
+  #ui output for selecting marker icons
   output$icon_palette <- renderUI({
 
     radioGroupButtons(
@@ -53,14 +54,14 @@ server <- function(input, output,session) {
 
   })
 
-  #if custom icons are confirmed
+  #when confirm_icons is clicked; add new marker icons 
   observeEvent(input$confirm_icons,{
     req(input$iconpicker)
     
     #custom icons need to be added to AwesomIconList all__marker_icons() in order to
     #use them in leaflet markers
     
-    #create an awesomeIconList for custom markers
+    #create a new awesomeIconList for custom markers
     new_custom_marker_icons <- maak_custom_marker_icons(input$iconpicker,input$kleur)
     
     #append new awesomeIconList to existing list
@@ -92,25 +93,40 @@ server <- function(input, output,session) {
     
   })
   
+#If remove all is clicked; remove all custom icons 
   observeEvent(input$clear_custom_icons,{
     
     custom_marker_icons_values(NULL)
-    all_marker_icons_values(default_icon_values)
+    all_marker_icons_values(default_icon_values) #set to default
+    
+    #TODO remove icons from awesomeIconList as well.
     
   })
   
-  
-  #### MAP IMAGE INPUT #####
-  
-  #img_input modal
+
+# map inputs --------------------------------------------------------------
+
+  #modal dialog with textinput for image url
   img_input <-  modalDialog(
         textInput("image_url","Paste an image url"),
         uiOutput("url_confirm") %>% withSpinner(color = "blue")
-       
-  )
+        )
+
+  #show img_input modal on startup
+  session$onFlushed(function() {
+    
+    isolate({
+      showModal(img_input)
+    })
+  })
   
+  #show img_input modal when actionbutton is clicked
+  observeEvent(input$open_img_input,{
+    showModal(img_input)
+  })
   
-  
+  #output with confirm button. should only show confirm when the correct filetype
+  #is entered in image_url and the image_dimensions are retrieved from client.
   output$url_confirm <- renderUI({
     req(input$image_url)
     if(!str_extract(input$image_url,"\\.[a-zA-Z0-9]+$") %in% c(".png",".jpeg",".jpg",".gif",".bmp",".svg")){
@@ -125,59 +141,46 @@ server <- function(input, output,session) {
         <li> svg </li>"
         )
     } else if(is.null(img_dimensions())){
-     # img(src=, width = "200px")
-      
+
       HTML("<p>Getting image dimensions ...  <img src = 'spinner.svg' width = '10%'></p>")
 
     } else{
       actionButton("url_confirm","Confirm")
     }
   })
-  
+
+  #when image dimensions are retrieved from client; set image_dimensions()
   observeEvent(input$image_url,{
     req(input$img_dimensions)
     img_dimensions(input$img_dimensions)
     
   })
   
-  # Observe event to trigger on app start
-  session$onFlushed(function() {
-    
-    isolate({
-      showModal(img_input)
-    })
-  })
-  
-  observeEvent(input$open_img_input,{
-    showModal(img_input)
-  })
-  
-  # Reactive values to store the name and dimensions of the uploaded image
-  # Reactive values to store the name and dimensions of the uploaded image
+
+  # Reactive values to store the url, name and dimensions of the uploaded image
   img_src <- reactiveVal() # Image URL
   img_name <- reactiveVal() # Name of the image
   img_dimensions <- reactiveVal(NULL) # Image dimensions
   
+  #observe changes in the image_url input and update img values
   observe({
     req(input$image_url)
     img_src(input$image_url)
-    img_name(str_extract(input$image_url, "[^/]*(?=\\.[:alpha:]*$)"))
+    img_name(str_extract(input$image_url, "[^/]*(?=\\.[:alpha:]*$)")) #last part of url between "/" and .filetype
     img_dimensions(input$img_dimensions) # Assuming this comes from JavaScript
   })
   
-  
-
-  
-  # Observe the img_dimensions and enable/disable the confirm button
-  #Als er een url wordt geconfirmed
+  #TODO rename URL Confirm
+  #TODO Ergens wordt er NIET een popup variabele aangemaakt; dat moet wel
+  #when an image url is confirmed
   observeEvent(input$url_confirm,{
     req(img_dimensions())
     
-    removeModal()
+    removeModal() #remove image url input modal
 
-    # Clear existing values
+    #clear saved map & marker values
     map_reactive(NULL)
-    markers_df(data.frame(
+    df_markers(data.frame(
       group = character(),
       lng = numeric(),
       lat = numeric(),
@@ -188,14 +191,11 @@ server <- function(input, output,session) {
       url_label = character(),
       popup_image_url = character(),
       popup_image_url_label = character(),
+      popup = character(),
       stringsAsFactors = FALSE
     ))
-    # img_src(NULL)
-    # img_name(NULL)
-    # img_dimensions(NULL)
-    
-    
-    #Leafletmap renderen
+
+    #render leafletmap
     output$mymap <- renderLeaflet({
       
       if(!is.null(img_dimensions())){
@@ -205,59 +205,61 @@ server <- function(input, output,session) {
         
         mymap = leaflet() %>%
           # addTiles() %>% 
-          setView(lng = 0, lat = 45, zoom = 8) %>%  # Initial view settings, adjust as necessary
+          setView(lng = 0, lat = 45, zoom = 8) %>%  # initial view; scaled to img_bounds
+          
+          #js function that gets image dimensions from the client and converts these to
+          #image bounds for the leaflet map. Correctfactor for curvature of the earth so image the isnt stretched
           htmlwidgets::onRender(glue::glue("
-    function(el, x) {{
-        var myMap = this;
-        var imageUrl = '{image_src}';
-        
-        // Get image dimensions from R
-        var imgDimensions = [{image_dimensions[2]}, {image_dimensions[1]}];
-        
-        // Calculate aspect ratio (width / height)
-        var aspectRatio = imgDimensions[0] / imgDimensions[1];
-        
-        // Define the initial bounds
-        var latMin = 40;
-        var latMax = 50;
-        var lngMin = -5;
-        var lngMax = 5;
-
-        // Calculate the center point
-        var latCenter = (latMin + latMax) / 2;
-        var lngCenter = (lngMin + lngMax) / 2;
-
-        // Calculate the current bounds ranges
-        var latRange = latMax - latMin;
-        var lngRange = lngMax - lngMin;
-
-        // Calculate the distance and correction factor for longitude
-        var correctionFactor = Math.cos(latCenter * Math.PI / 180);
-
-        // Adjust the bounds to maintain the aspect ratio
-        if (latRange / (lngRange * correctionFactor) > aspectRatio) {{
-            // Adjust the longitude range to maintain the aspect ratio
-            var newLngRange = latRange / aspectRatio;
-            lngMin = lngCenter - (newLngRange / 2) / correctionFactor;
-            lngMax = lngCenter + (newLngRange / 2) / correctionFactor;
-        }} else {{
-            // Adjust the latitude range to maintain the aspect ratio
-            var newLatRange = lngRange * aspectRatio * correctionFactor;
-            latMin = latCenter - (newLatRange / 2);
-            latMax = latCenter + (newLatRange / 2);
-        }}
-
-        var imageBounds = [[latMin, lngMin], [latMax, lngMax]];
-
-        // Add the image overlay
-        L.imageOverlay(imageUrl, imageBounds).addTo(myMap);
-        
-        // Adjust the map view to fit the image bounds
-        myMap.fitBounds(imageBounds);
-    }}
-"))
-        
-        
+          
+          function(el, x) {{
+            
+          var myMap = this;
+          var imageUrl = '{image_src}';
+          
+          // Get image dimensions from R
+          var imgDimensions = [{image_dimensions[2]}, {image_dimensions[1]}];
+          
+          // Calculate aspect ratio (width / height)
+          var aspectRatio = imgDimensions[0] / imgDimensions[1];
+          
+          // Define the initial bounds
+          var latMin = 40;
+          var latMax = 50;
+          var lngMin = -5;
+          var lngMax = 5;
+  
+          // Calculate the center point
+          var latCenter = (latMin + latMax) / 2;
+          var lngCenter = (lngMin + lngMax) / 2;
+  
+          // Calculate the current bounds ranges
+          var latRange = latMax - latMin;
+          var lngRange = lngMax - lngMin;
+  
+          // Calculate the distance and correction factor for longitude
+          var correctionFactor = Math.cos(latCenter * Math.PI / 180);
+  
+          // Adjust the bounds to maintain the aspect ratio
+          if (latRange / (lngRange * correctionFactor) > aspectRatio) {{
+              // Adjust the longitude range to maintain the aspect ratio
+              var newLngRange = latRange / aspectRatio;
+              lngMin = lngCenter - (newLngRange / 2) / correctionFactor;
+              lngMax = lngCenter + (newLngRange / 2) / correctionFactor;
+          }} else {{
+              // Adjust the latitude range to maintain the aspect ratio
+              var newLatRange = lngRange * aspectRatio * correctionFactor;
+              latMin = latCenter - (newLatRange / 2);
+              latMax = latCenter + (newLatRange / 2);
+          }}
+  
+          var imageBounds = [[latMin, lngMin], [latMax, lngMax]];
+  
+          // Add the image overlay
+          L.imageOverlay(imageUrl, imageBounds).addTo(myMap);
+          
+          // Adjust the map view to fit the image bounds
+          myMap.fitBounds(imageBounds);
+          }}"))
         
         map_reactive(mymap)
         mymap
@@ -266,127 +268,10 @@ server <- function(input, output,session) {
     
   })
   
-  ##### LOAD MAP FILE
-  #Als er een map file wordt ingeladen
-  observeEvent(input$map_file, {
-    req(input$map_file)
-    
-    # Clear existing values
-    map_reactive(NULL)
-    markers_df(data.frame(
-      group = character(),
-      lng = numeric(),
-      lat = numeric(),
-      label = character(),
-      icon = character(),
-      content = character(),
-      url = character(),
-      url_label = character(),
-      stringsAsFactors = FALSE
-    ))
-    img_src(NULL)
-    img_name(NULL)
-    img_dimensions(NULL)
-    
-    
-    
-    load(input$map_file$datapath)
-    
-    
-    
-    # Check that necessary variables exist in the loaded environment
-    if (exists("mymap") && exists("saved_img_src") && exists("saved_markers_df") && exists("saved_img_dimensions") && 
-        exists("saved_custom_icons") && exists("saved_custom_marker_icons_values")) {
-      
-      #append custom_icons
-      custom_marker_icons_values(c(custom_marker_icons_values(),saved_custom_marker_icons_values))
-      all_marker_icons(c(all_marker_icons(), saved_custom_icons)) 
-      
-      
-      map_reactive(mymap)
-      img_src(saved_img_src)
-      img_name(str_extract(saved_img_src, "[^/]*(?=\\.[:alpha:]*$)"))
-      markers_df(saved_markers_df)
-      img_dimensions(saved_img_dimensions)
-      
-      # Render the map with the image overlay and markers
-      output$mymap <- renderLeaflet({
-        leaflet() %>%
-          setView(lng = 0, lat = 45, zoom = 8) %>%
-          htmlwidgets::onRender(glue::glue("
-          function(el, x) {{
-              var myMap = this;
-              var imageUrl = '{saved_img_src}';
-              
-              var imgDimensions = [{saved_img_dimensions[2]}, {saved_img_dimensions[1]}];
-              
-              var aspectRatio = imgDimensions[0] / imgDimensions[1];
-              
-              var latMin = 40;
-              var latMax = 50;
-              var lngMin = -5;
-              var lngMax = 5;
 
-              var latCenter = (latMin + latMax) / 2;
-              var lngCenter = (lngMin + lngMax) / 2;
 
-              var latRange = latMax - latMin;
-              var lngRange = lngMax - lngMin;
-
-              var correctionFactor = Math.cos(latCenter * Math.PI / 180);
-
-              if (latRange / (lngRange * correctionFactor) > aspectRatio) {{
-                  var newLngRange = latRange / aspectRatio;
-                  lngMin = lngCenter - (newLngRange / 2) / correctionFactor;
-                  lngMax = lngCenter + (newLngRange / 2) / correctionFactor;
-              }} else {{
-                  var newLatRange = lngRange * aspectRatio * correctionFactor;
-                  latMin = latCenter - (newLatRange / 2);
-                  latMax = latCenter + (newLatRange / 2);
-              }}
-
-              var imageBounds = [[latMin, lngMin], [latMax, lngMax]];
-
-              L.imageOverlay(imageUrl, imageBounds).addTo(myMap);
-              myMap.fitBounds(imageBounds);
-          }}
-          "))
-      })
-      
-      # Use leafletProxy to add markers from the loaded data
-      proxy <- leafletProxy("mymap")
-      for (i in 1:nrow(markers_df())) {
-        label <- markers_df()$label[i]
-        url <- markers_df()$url[i]
-        url_label <- markers_df()$url_label[i]
-        content <- markers_df()$content[i]
-        popup_content <- glue::glue("<h1>{label}</h1>")
-        if (nzchar(url)) {
-          url_label <- ifelse(nzchar(url_label), url_label, "read more")
-          popup_content <- glue::glue("{popup_content}<a href=\"{url}\"  target='_PARENT'>{url_label}</a>")
-        }
-        if (nzchar(content)) {
-          popup_content <- glue::glue("{popup_content}<p>{content}</p>")
-        }
-        
-        proxy <- proxy %>%
-          addAwesomeMarkers(
-            group = markers_df()$group[i],
-            lng = markers_df()$lng[i],
-            lat = markers_df()$lat[i],
-            label = label,
-            icon = all_marker_icons()[[markers_df()$icon[i]]],
-            popup = HTML(popup_content),
-            options = markerOptions(draggable = T)
-            )
-      }
-    } else {
-      showNotification("Invalid .Rdata file")
-    }
-  })
   
   ##### MARKERS ####
-  
   marker_inputs <- modalDialog(
     uiOutput("icon_palette"),
     #triggers modal for selecting custom marker icons
@@ -430,8 +315,8 @@ server <- function(input, output,session) {
     
     #Update alle inputs naar de content van de gekozen marker
     
-    markers_df_new <- markers_df()
-    selected_marker <- markers_df_new[markers_df_new$group == target_marker_group(),]
+    new_df_markers <- df_markers()
+    selected_marker <- new_df_markers[new_df_markers$group == target_marker_group(),]
     
     
     isolate({
@@ -483,19 +368,20 @@ server <- function(input, output,session) {
     default_icoon <- ifelse(is.null(input$marker_icon),"kasteel",input$marker_icon)
 
     #dataframe markers; bijwerken met nieuwe marker
-    markers_df(rbind(markers_df(),
+    df_markers(rbind(df_markers(),
                      
                      data.frame(
-                       "group" = target_marker_group(),
-                       "lng" = click$lng,
-                       "lat" = click$lat,
-                       "label" = "",
-                       "icon" = default_icoon, 
-                       "content" = "",
-                       "url" = "",
-                       "url_label" = "",
-                       "popup_image_url" = "",
-                       "popup_image_url_label" = ""
+                       group = target_marker_group(),
+                       lng = click$lng,
+                       lat = click$lat,
+                       label = "",
+                       icon = default_icoon, 
+                       content = "",
+                       url = "",
+                       url_label = "",
+                       popup_image_url = "",
+                       popup_image_url_label = "",
+                       popup = ""
                        
                      )))
     
@@ -551,12 +437,12 @@ server <- function(input, output,session) {
     group <- input$mymap_marker_dragend$group 
     target_marker_group(group)
     
-    markers_df_new <- markers_df()
+    new_df_markers <- df_markers()
     
-    markers_df_new$lng[markers_df_new$group == target_marker_group()] <- lng
-    markers_df_new$lat[markers_df_new$group == target_marker_group()] <- lat
+    new_df_markers$lng[new_df_markers$group == target_marker_group()] <- lng
+    new_df_markers$lat[new_df_markers$group == target_marker_group()] <- lat
 
-    markers_df(markers_df_new)
+    df_markers(new_df_markers)
 
   })
   
@@ -565,124 +451,52 @@ server <- function(input, output,session) {
   target_marker_group <- reactiveVal()
 
 
-  
-  #TODO; al deze observeEVENTS verwijderen & direct de inputs voeden aan marker_df wanneer confirm_marker wordt geklickt
-  #Geen enkele reden om dingen direct te updaten als we een confirm button hebben
-  #Als er een label wordt ingevuld; pas label aan
-  observeEvent(input$label_marker,{
-    if(!is.null(target_marker_coords())){
-      
-      markers_df_new <- markers_df()
-      
-      markers_df_new$label[markers_df_new$group == target_marker_group()] <- input$label_marker
-      
-      markers_df(markers_df_new)
-    }
-  })
-  
-  #Als er een url wordt ingevuld; pas url aan
-  observeEvent(input$url_marker,{
-    
-    markers_df_new <- markers_df()
-    
-    markers_df_new$url[markers_df_new$group == target_marker_group()] <- input$url_marker
-    
-    markers_df(markers_df_new)
-    
-  })
-  
-  #Als er een url label wordt ingevuld; pas url label aan
-  observeEvent(input$url_label_marker,{
-    
-    markers_df_new <- markers_df()
-    
-    markers_df_new$url_label[markers_df_new$group == target_marker_group()] <- input$url_label_marker
-    
-    markers_df(markers_df_new)
-    
-  })
-  
-  #Als er content wordt ingevuld; pas content aan
-  observeEvent(input$content_marker,{
-    
-    markers_df_new <- markers_df()
-    
-    markers_df_new$content[markers_df_new$group == target_marker_group()] <- input$content_marker
-    
-    markers_df(markers_df_new)
-    
-  })
-  
-  #Als er een image url wordt ingevuld; pas img url aan
-  observeEvent(input$popup_image_url,{
-
-    markers_df_new <- markers_df()
-    
-    markers_df_new$popup_image_url[markers_df_new$group == target_marker_group()] <- input$popup_image_url
-    
-    markers_df(markers_df_new)
-    
-  })
-  
-  #Als er een image_url alt text wordt ingevuld; pas img url alt text aan
-  observeEvent(input$popup_image_alt_text,{
-    
-    markers_df_new <- markers_df()
-    
-    markers_df_new$popup_image_url_label[markers_df_new$group == target_marker_group()] <- input$popup_image_alt_text
-    
-    markers_df(markers_df_new)
-    
-  })
-  
-  #Als er een ander Icon wordt geselecteerd; verander het icoon van de geselecteerde marker
-  observeEvent(input$marker_icon, {
-    req(target_marker_coords())
-    
-    markers_df_new <- markers_df()
-    markers_df_new$icon[markers_df_new$group == target_marker_group()] <- input$marker_icon
-    markers_df(markers_df_new)
-    
-  }, ignoreNULL = TRUE)
-
-  
-  
   #Als er een wijziging van markers doorgevoerd wordt
   observeEvent(input$confirm_marker_inputs,{
                       
-    removeModal()
+    removeModal() #remove marker input modal
                       
     if(!is.null(target_marker_coords())){
       
-      markers_df_new <- markers_df() 
-      
-      marker_info <- markers_df_new[markers_df_new$group == target_marker_group(),]
-      
+      new_df_markers <- df_markers() 
 
-      # icoon <- marker_info$icon
-      icoon <- marker_info$icon
+      #get df row for selected marker
+      selected_marker <- new_df_markers[new_df_markers$group == target_marker_group(),]
       
-      label <- marker_info$label
-      url <- marker_info$url
-      url_label <- marker_info$url_label
-
+      #update popup values for selected marker
+      selected_marker$icon <- input$marker_icon
+      selected_marker$label <- input$label_marker
+      selected_marker$url <- input$url_marker
+      selected_marker$url_label <- input$url_label_marker
+      selected_marker$popup_image_url <- input$popup_image_url
+      selected_marker$popup_image_url_label <- input$popup_image_alt_text
+      selected_marker$content <- input$content_marker
+      
+      #update popup variable with constructed html str from popup values
+      
+      #construct popup html
+      label <- selected_marker$label
+      url <- selected_marker$url
+      url_label <- selected_marker$url_label
+      
       url_in_popup <- case_when(url == "" ~ "",
                                 url != "" & url_label == "" ~ glue("<a href={url} target='_PARENT'>read more</a>"),
                                 url != "" & url_label != "" ~ glue("<a href={url} target='_PARENT'>{url_label}</a>"),
                                 TRUE ~ "")
       
+
       popup_image <- input$popup_image_url
       popup_image_alt_text <- input$popup_image_alt_text
       
       image_in_popup <- case_when(popup_image == "" ~ "",
-                                  popup_image != "" & popup_image_alt_text == "" ~ glue("<img src='{popup_image}' width = '40%' height = '100%' style='margin-right: 10px; object-fit:cover;' ></img>"),
-                                  popup_image != "" & popup_image_alt_text != "" ~ glue("<img src='{popup_image}' width = '40%' height = '100%' style='margin-right: 10px; object-fit:cover;' alt='{popup_image_alt_text}' width = '50%'></img>"),
+                                  popup_image != "" & popup_image_alt_text == "" ~ 
+                                    glue("<img src='{popup_image}' width = '40%' height = '100%' style='margin-right: 10px; object-fit:cover;' ></img>"),
+                                  popup_image != "" & popup_image_alt_text != "" ~ 
+                                    glue("<img src='{popup_image}' width = '40%' height = '100%' style='margin-right: 10px; object-fit:cover;' alt='{popup_image_alt_text}' width = '50%'></img>"),
                                   TRUE ~ ""
-                                  )
+      )
       
-      popup <- HTML(glue(
-
-        "
+      popup_html <- HTML(glue("
         <style> div.leaflet-popup-content {{max-width:80vh; min-width:20vw; max-height:40vh;}}</style>
         <h2 style='word-break:break-word;'>{label}</h2>
         
@@ -690,12 +504,28 @@ server <- function(input, output,session) {
         <br>
         <div style='display:flex; align-items:flex-start;'>
         {image_in_popup}
-        <p style='min-width:50%; max-height:20vh; margin-top:0px; word-break:break-word; overflow-y:auto; overflow-x:hidden;'> {marker_info$content}</p>
+        <p style='min-width:50%; max-height:20vh; margin-top:0px; word-break:break-word;
+        overflow-y:auto; overflow-x:hidden;'> {selected_marker$content}</p>
         </div>"
         
       ))
       
+      #update popup var with constructed html
+      selected_marker$popup <- popup_html
       
+      selected_marker <<- selected_marker
+      
+      print("Hier")
+      
+      #write updated selected marker to df_marers()
+      new_df_markers[new_df_markers$group == target_marker_group(),] <- selected_marker
+
+      df_markers(new_df_markers)
+
+      #get marker icon
+      icoon <- selected_marker$icon
+      
+
       #Wijzigingen aanbrengen aan reactive voor html
       mymap <- map_reactive() %>%
         clearGroup(target_marker_group()) %>% 
@@ -705,7 +535,7 @@ server <- function(input, output,session) {
           lat = target_marker_coords()[2],
           label = label,
           icon = all_marker_icons()[[icoon]],
-          popup = popup,
+          popup = popup_html,
           options = markerOptions(draggable = T))
       
       
@@ -721,14 +551,13 @@ server <- function(input, output,session) {
           lat = target_marker_coords()[2],
           label = label,
           icon = all_marker_icons()[[icoon]],
-          popup =             paste0(actionButton("edit", "Edit", onclick = 'Shiny.onInputChange(\"edit_popup\", Math.random())'),
-            popup),
+          popup = paste0(actionButton("edit", "Edit", onclick = 'Shiny.onInputChange(\"edit_popup\", Math.random())'),
+                         popup_html),
           options = markerOptions(draggable = T)
         )
     }
   })
-  
-  
+
   
   #Als er op remove wordt geklikt; verwijder een marker
   observeEvent(input$remove,{
@@ -747,7 +576,7 @@ server <- function(input, output,session) {
         clearGroup(target_marker_group())
       
       #dataframe met markers bijwerken en huidige marker verwijderen
-      markers_df(markers_df()[markers_df()$group != target_marker_group(),])
+      df_markers(df_markers()[df_markers()$group != target_marker_group(),])
       
       #Update alle inputs naar leeg
       updateTextInput(session,"label_marker",
@@ -778,12 +607,12 @@ server <- function(input, output,session) {
       content = function(file) {
         mymap <- map_reactive()
         saved_img_src <- img_src()
-        saved_markers_df <- markers_df()
+        saved_df_markers <- df_markers()
         saved_img_dimensions <- img_dimensions()
         saved_custom_icons <- all_marker_icons()
         saved_custom_marker_icons_values <- custom_marker_icons_values()
         
-        save(mymap, saved_img_src, saved_markers_df, saved_img_dimensions, 
+        save(mymap, saved_img_src, saved_df_markers, saved_img_dimensions, 
              saved_custom_icons, saved_custom_marker_icons_values, file = file)
       }
     )
@@ -837,6 +666,130 @@ server <- function(input, output,session) {
     ))
   })
   
+  
+  
+  #when an R.data map file is uploaded
+  observeEvent(input$map_file, {
+    req(input$map_file)
+    
+    # clear existing map and marker values
+    map_reactive(NULL)
+    df_markers(data.frame(
+      group = character(),
+      lng = numeric(),
+      lat = numeric(),
+      label = character(),
+      icon = character(),
+      content = character(),
+      url = character(),
+      url_label = character(),
+      popup_image_url = character(),
+      popup_image_url_label = character(),
+      popup = character(),
+      stringsAsFactors = FALSE
+    ))
+    
+    img_src(NULL)
+    img_name(NULL)
+    img_dimensions(NULL)
+    
+    #load the rdata file
+    load(input$map_file$datapath)
+    
+    # Check that necessary variables exist in the loaded environment
+    if (exists("mymap") && exists("saved_img_src") && exists("saved_df_markers") && exists("saved_img_dimensions") && 
+        exists("saved_custom_icons") && exists("saved_custom_marker_icons_values")) {
+      
+      #append custom_icons
+      custom_marker_icons_values(c(custom_marker_icons_values(),saved_custom_marker_icons_values))
+      all_marker_icons(c(all_marker_icons(), saved_custom_icons)) 
+      
+      #update map, image and marker data
+      map_reactive(mymap)
+      img_src(saved_img_src)
+      img_name(str_extract(saved_img_src, "[^/]*(?=\\.[:alpha:]*$)"))
+      df_markers(saved_df_markers)
+      img_dimensions(saved_img_dimensions)
+      
+      # Render the map with image overlay and markers
+      output$mymap <- renderLeaflet({
+        leaflet() %>%
+          setView(lng = 0, lat = 45, zoom = 8) %>% #initial view
+          #js to add image to map without stretching it 
+          htmlwidgets::onRender(glue::glue("
+          function(el, x) {{
+              var myMap = this;
+              var imageUrl = '{saved_img_src}';
+              
+              var imgDimensions = [{saved_img_dimensions[2]}, {saved_img_dimensions[1]}];
+              
+              var aspectRatio = imgDimensions[0] / imgDimensions[1];
+              
+              var latMin = 40;
+              var latMax = 50;
+              var lngMin = -5;
+              var lngMax = 5;
+
+              var latCenter = (latMin + latMax) / 2;
+              var lngCenter = (lngMin + lngMax) / 2;
+
+              var latRange = latMax - latMin;
+              var lngRange = lngMax - lngMin;
+
+              var correctionFactor = Math.cos(latCenter * Math.PI / 180);
+
+              if (latRange / (lngRange * correctionFactor) > aspectRatio) {{
+                  var newLngRange = latRange / aspectRatio;
+                  lngMin = lngCenter - (newLngRange / 2) / correctionFactor;
+                  lngMax = lngCenter + (newLngRange / 2) / correctionFactor;
+              }} else {{
+                  var newLatRange = lngRange * aspectRatio * correctionFactor;
+                  latMin = latCenter - (newLatRange / 2);
+                  latMax = latCenter + (newLatRange / 2);
+              }}
+
+              var imageBounds = [[latMin, lngMin], [latMax, lngMax]];
+
+              L.imageOverlay(imageUrl, imageBounds).addTo(myMap);
+              myMap.fitBounds(imageBounds);
+          }}
+          "))
+      })
+      
+      # Use leafletProxy to add markers from the loaded data
+      proxy <- leafletProxy("mymap")
+      
+      for (i in 1:nrow(df_markers())) {
+        
+        label <- df_markers()$label[i]
+        url <- df_markers()$url[i]
+        url_label <- df_markers()$url_label[i]
+        popup_image_url <- df_markers()$popup_image_url[i]
+        popup_image_url_label <- df_markers()$popup_image_url_label[i]
+        content <- df_markers()$content[i]
+        popup_content <- df_markers()$popup
+        
+
+        
+        proxy <- proxy %>%
+          addAwesomeMarkers(
+            group = df_markers()$group[i],
+            lng = df_markers()$lng[i],
+            lat = df_markers()$lat[i],
+            label = label,
+            icon = all_marker_icons()[[df_markers()$icon[i]]],
+            popup = HTML(paste0(
+              actionButton("edit",
+                           "Edit",
+                           onclick = 'Shiny.onInputChange(\"edit_popup\", Math.random())'),#edit button. mathrandom to trigger oninputchange each time
+              popup_content)),
+            options = markerOptions(draggable = T)
+          )
+      }
+    } else {
+      showNotification("Invalid .Rdata file")
+    }
+  })
 
   
 }
