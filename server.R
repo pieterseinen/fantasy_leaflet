@@ -46,6 +46,10 @@ server <- function(input, output,session) {
         <li> gif </li>
         <li> bmp </li>
         <li> svg </li>")
+      } else if(is.null(img_dimensions())){
+       
+        HTML("<p>Getting image dimensions ...  <img src = 'spinner.svg' width = '10%'></p>")
+        
       } else{
       actionButton("confirm_img_url","Confirm")
     }
