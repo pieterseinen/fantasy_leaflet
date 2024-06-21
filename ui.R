@@ -17,10 +17,18 @@ ui <- dashboardPage(
     fileInput("map_file", "Load saved map from Rdata",accept = ".Rdata"),
     
     #github link 
-    #TODO mooi maken
-    HTML("<a href = 'https://github.com/pieterseinen/fantasy_leaflet'>
-    <h1 width = '90%'> Github </h1>
-         </a><br>"),
+    
+    #TODO move to .css file
+    HTML("
+    
+    
+    <div style = 'border: 2px solid#000; border-radius: 10px;
+    padding: 20px;'>
+    <a href = 'https://github.com/pieterseinen/fantasy_leaflet'>
+    <i class='fa-solid fa-code'></i> View Code
+    </a>
+    </div>
+         "),
     
     #buymeacoffee link
     HTML(
