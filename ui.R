@@ -22,7 +22,9 @@ ui <- dashboardPage(
     <a href='https://github.com/pieterseinen/fantasy_leaflet' class='fill-div'>
         <i class='fa-solid fa-code'></i> View Code
     </a>
-    </div>"
+    </div>
+
+    "
     ),
     
     #buymeacoffee link
@@ -39,10 +41,10 @@ ui <- dashboardPage(
   dashboardBody(
     shinyjs::useShinyjs(),
 
-    tags$head(tags$link(rel = "stylesheet", type = "text/css",
-                        href = "custom.css")),
+    tags$head(
+      tags$link(rel = "stylesheet", type = "text/css",
+                href = "custom.css")),
     
-    #when image_input changes; send image_dimensions to server
     tags$script(HTML("
     $(document).on('change', '#image_url', function() {
       var imgUrl = $(this).val();
