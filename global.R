@@ -8,6 +8,7 @@ library(htmlwidgets)
 library(glue)
 library(png)
 library(dplyr)
+library(shinycssloaders)
 library(colourpicker)
 
 
