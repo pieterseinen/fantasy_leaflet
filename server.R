@@ -562,15 +562,39 @@ server <- function(input, output,session) {
           }
           }
         
-        #save map als self contained htmlwidget
+        # Save map as self-contained htmlwidget
         saveWidget(mymap, file = file, selfcontained = TRUE)
         
-        #link to fontawesome css needs to be included in html; inject 
-        #Inject FontAwesome CSS link into saved HTML
+        # Read the HTML lines from the saved file
         html_lines <- readLines(file)
+        
+        # Define the FontAwesome CSS link
         fa_css_link <- '<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css">'
-        html_lines <- sub('</head>', paste0(fa_css_link, '\n</head>'), html_lines)
-        writeLines(html_lines, file)
+        
+        # Define the custom CSS styles
+        custom_css <- '
+        <style>
+        img.popup-image {
+          width: 50%;
+          height: 100%;
+          margin-right: 10px;
+          object-fit: cover;
+        }
+        p.popup {
+          min-width: 50%;
+          max-height: 20vh;
+          margin-top: 0px;
+          word-break: break-word;
+          overflow-y: auto;
+          overflow-x: hidden;
+        }
+        </style>'
+    
+    # Inject the FontAwesome CSS link and custom CSS into the <head> section
+    html_lines <- sub('</head>', paste0(fa_css_link, '\n', custom_css, '\n</head>'), html_lines)
+    
+    # Write the modified HTML lines back to the file
+    writeLines(html_lines, file)
       }
     )
     
