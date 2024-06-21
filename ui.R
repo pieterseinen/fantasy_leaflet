@@ -17,17 +17,22 @@ ui <- dashboardPage(
     fileInput("map_file", "Load saved map from Rdata",accept = ".Rdata"),
     
     #github link 
-    #TODO mooi maken
-    HTML("<a href = 'https://github.com/pieterseinen/fantasy_leaflet'>
-    <h1 width = '90%'> Github </h1>
-         </a><br>"),
+    HTML("
+    <div id='my-box'>
+    <a href='https://github.com/pieterseinen/fantasy_leaflet' class='fill-div'>
+        <i class='fa-solid fa-code'></i> View Code
+    </a>
+    </div>
+
+    "
+    ),
     
     #buymeacoffee link
     HTML(
       "<a href='https://www.buymeacoffee.com/pieterseinen'>
-      <img src='https://img.buymeacoffee.com/button-api/?text=
+      <img id='coffee-link' src='https://img.buymeacoffee.com/button-api/?text=
       Buy me a coffee&emoji=&slug=pieterseinen&button_colour=FFDD00&font_colour=000000&font_family=Cookie&outline_colour=000000&coffee_colour=ffffff'
-      width = '90%'
+      
       />
       </a>"
       )
@@ -35,24 +40,11 @@ ui <- dashboardPage(
   
   dashboardBody(
     shinyjs::useShinyjs(),
-    #TODO move to .css file
-    tags$style(
-      "
-      #edit{
-      position: absolute;
-      right:10%;
-      z-index:1000;
-      float: right;
-      top: 0%;
-      }
-      
-      .leaflet-popup-content{
-      position: relative;
-      }
-      "
-      ),
+
+    tags$head(
+      tags$link(rel = "stylesheet", type = "text/css",
+                href = "custom.css")),
     
-    #TODO move to .js file? 
     tags$script(HTML("
     $(document).on('change', '#image_url', function() {
       var imgUrl = $(this).val();
