@@ -1,0 +1,74 @@
+/* for View code button*
+make url cover entire box div*/
+
+#my-box {
+    background-color: #ffffff;
+    border-radius: 10px;
+    width: 90%;
+    margin-left: 5%;
+    margin-right: 5%;
+    margin-bottom: 5%;
+    height: 4vh;
+    overflow: hidden;
+    position: relative;
+    display: flex; /* Use flexbox for alignment */
+    justify-content: center; /* Center horizontally */
+    align-items: center; /* Center vertically */
+}
+
+a.fill-div {
+    display: flex; /* Use flexbox for alignment */
+    justify-content: center; /* Center horizontally */
+    align-items: center; /* Center vertically */
+    height: 100%;
+    width: 100%;
+    text-decoration: none;
+    color: #000000 !important; 
+    position: absolute;
+    top: 0;
+    left: 0;
+}
+
+img.popup-image {
+  
+   width: 50%;
+   height: 100%;
+   margin-right: 10px;
+   object-fit: cover;
+   
+}
+
+p.popup {
+  min-width:50%;
+  max-height:20vh;
+  margin-top:0px;
+  word-break:break-word;
+  overflow-y:auto; overflow-x:hidden;
+  
+}
+
+.h3 {
+  word-break:break-word;
+}
+
+#coffee-link{
+  
+  margin-left: 5%;
+  margin-right: 5%;
+  width: 90%;
+  
+}
+
+
+/*For edit button in popup window: float to  top-right */
+#edit{
+  position: absolute;
+  right:10%;
+  z-index:1000;
+  float: right;
+  top: 0%;
+}
+      
+.leaflet-popup-content{
+  position: relative;
+  }

@@ -1,34 +1,11 @@
 server <- function(input, output,session) {
 
-# reactiveVals ------------------------------------------------------------
-  
-  #leaflet map object for saving to Rdata 
-  map_reactive <- reactiveVal()
-  
-  #reactiveVal df to save marker data
-  df_markers <- reactiveVal(data.frame(
-    group = character(),
-    lng = numeric(),
-    lat = numeric(),
-    label = character(),
-    icon = character(),
-    content = character(),
-    url = character(),
-    url_label = character(),
-    popup_image_url = character(),
-    popup_image_url_label = character(),
-    popup = character(),
-    stringsAsFactors = FALSE
-  ))
-  
-
-  all_marker_icons <- reactiveVal(default_marker_icons)   #awesomeIconList that can be appended with custom icons
-  all_marker_icons_values <- reactiveVal(default_icon_values) # named character with <icon> html for both default & custom icons
-  custom_marker_icons_values <- reactiveVal() #seperate named character with <icon> html for custom icons so they can be removed easily
-  
 # background image inputs --------------------------------------------------------------
   
-  # Reactive values to store the url, name and dimensions of the uploaded image
+  #reactive value for storing leaflet map object (for saving to Rdata) 
+  map_reactive <- reactiveVal()
+  
+  #reactive values for storing url, name and dimensions of the uploaded image
   img_src <- reactiveVal() # Image URL
   img_name <- reactiveVal() # Name of the image
   img_dimensions <- reactiveVal(NULL) # Image dimensions
@@ -36,10 +13,10 @@ server <- function(input, output,session) {
   
   #modal dialog with textinput for image url
   img_input <-  modalDialog(
-    #TODO add upload file button
-    textInput("image_url","Paste an image url"),
-    uiOutput("confirm_img_url") %>% withSpinner(color = "blue")
     
+    textInput("image_url","Paste an image url"),
+    uiOutput("confirm_img_url"),
+    easyClose = T
   )
   
   #show img_input modal on startup
@@ -68,13 +45,8 @@ server <- function(input, output,session) {
         <li> jpg </li>
         <li> gif </li>
         <li> bmp </li>
-        <li> svg </li>"
-      )
-    } else if(is.null(img_dimensions())){
-      
-      HTML("<p>Getting image dimensions ...  <img src = 'spinner.svg' width = '10%'></p>")
-      
-    } else{
+        <li> svg </li>")
+      } else{
       actionButton("confirm_img_url","Confirm")
     }
   })
@@ -141,7 +113,24 @@ server <- function(input, output,session) {
   })
 
 # marker customization -------------------------------------------------------------------
-  #reactiveVal to save target marker coordinates and group id
+  
+  #reactiveVal df for saving marker data
+  df_markers <- reactiveVal(data.frame(
+    group = character(),
+    lng = numeric(),
+    lat = numeric(),
+    label = character(),
+    icon = character(),
+    content = character(),
+    url = character(),
+    url_label = character(),
+    popup_image_url = character(),
+    popup_image_url_label = character(),
+    popup = character(),
+    stringsAsFactors = FALSE
+  ))
+  
+  #reactiveVal for saving target marker coordinates and group id
   target_marker_coords <- reactiveVal()
   target_marker_group <- reactiveVal()
   
@@ -358,22 +347,21 @@ server <- function(input, output,session) {
       
       image_in_popup <- case_when(popup_image == "" ~ "",
                                   popup_image != "" & popup_image_alt_text == "" ~ 
-                                    glue("<img src='{popup_image}' width = '40%' height = '100%' style='margin-right: 10px; object-fit:cover;' ></img>"),
+                                    glue("<img src='{popup_image}' class = 'popup-image'></img>"),
                                   popup_image != "" & popup_image_alt_text != "" ~ 
-                                    glue("<img src='{popup_image}' width = '40%' height = '100%' style='margin-right: 10px; object-fit:cover;' alt='{popup_image_alt_text}' width = '50%'></img>"),
+                                    glue("<img src='{popup_image}' class = 'popup-image' alt='{popup_image_alt_text}'></img>"),
                                   TRUE ~ ""
       )
       
       popup_html <- HTML(glue("
         <style> div.leaflet-popup-content {{max-width:80vh; min-width:20vw; max-height:40vh;}}</style>
-        <h2 style='word-break:break-word;'>{label}</h2>
+        <h3>{label}</h3>
         
         {url_in_popup}
         <br>
         <div style='display:flex; align-items:flex-start;'>
         {image_in_popup}
-        <p style='min-width:50%; max-height:20vh; margin-top:0px; word-break:break-word;
-        overflow-y:auto; overflow-x:hidden;'> {selected_marker$content}</p>
+        <p class = 'popup'> {selected_marker$content}</p>
         </div>"
                               
       ))
@@ -446,6 +434,11 @@ server <- function(input, output,session) {
 
 # icon customization ------------------------------------------------------
 
+  all_marker_icons <- reactiveVal(default_marker_icons)   #awesomeIconList that can be appended with custom icons
+  all_marker_icons_values <- reactiveVal(default_icon_values) # named character with <icon> html for both default & custom icons
+  custom_marker_icons_values <- reactiveVal() #seperate named character with <icon> html for custom icons so they can be removed easily
+  
+  
   #ui output for selecting marker icons
   output$icon_palette <- renderUI({
 
@@ -500,10 +493,7 @@ server <- function(input, output,session) {
     
     custom_marker_icons_values(NULL)
     all_marker_icons_values(default_icon_values) #set to default
-    
-    #TODO optional remove icons from awesomeIconList all_marker_icons() as well as they wont be used anymore.
-    #Not removing them doesn't really impact UX. 
-    
+
   })
   
 
@@ -572,7 +562,7 @@ server <- function(input, output,session) {
         saveWidget(mymap, file = file, selfcontained = TRUE)
         
         #link to fontawesome css needs to be included in html; inject 
-        # Inject FontAwesome CSS link into saved HTML
+        #Inject FontAwesome CSS link into saved HTML
         html_lines <- readLines(file)
         fa_css_link <- '<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css">'
         html_lines <- sub('</head>', paste0(fa_css_link, '\n</head>'), html_lines)
