@@ -60,15 +60,15 @@ p.popup {
   
 }
 
-
-/*For edit button in popup window: float to  top-right */
-#edit{
+/*For edit and remove button in popup window: float to  top-right */
+#edit_remove {
   position: absolute;
   right:10%;
   z-index:1000;
   float: right;
   top: 0%;
 }
+
       
 .leaflet-popup-content{
   position: relative;

@@ -9,7 +9,9 @@ library(glue)
 library(png)
 library(dplyr)
 library(shinycssloaders)
+library(shinyjs)
 library(colourpicker)
+
 
 
 #Default aweseomeIconlist for iconinput
