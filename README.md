@@ -1,2 +1,2 @@
 # fantasy_leaflet
-Make selfcontained html leaflet maps with custom background images and markers.
+Make leaflet maps with custom background images and markers and save as selfcontained html file.
