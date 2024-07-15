@@ -207,8 +207,12 @@ server <- function(input, output,session) {
         icon = all_marker_icons()[[default_icoon]],
         options = markerOptions(draggable = T),
         popup = paste0(
-          actionButton("edit", "Edit", onclick = 'Shiny.onInputChange(\"edit_popup\", Math.random())'))
-        ) #Edit actionbutton, added Math.Random() so onInputchange is always triggered when the button is clicked
+          div(id = "edit_remove",
+              actionButton("edit", "Edit", onclick = 'Shiny.setInputValue(\"edit_popup\", 1)'),
+              actionButton("remove", "Remove", onclick = 'Shiny.setInputValue(\"remove_popup\", 1)')
+              )
+          )
+        )
     
     showModal(marker_inputs) #Show marker inputs
     
@@ -227,11 +231,10 @@ server <- function(input, output,session) {
       multiInput(inputId = "iconpicker",
                  label = "Icoon",
                  choices = icon_html),
-      
-      colourInput("kleur",
-                  label = "Color", value = "black",
-                  #palette = "limited",
-                  closeOnClick = T),
+      colourpicker::colourInput("kleur",
+                                label = "Color", value = "black",
+                                #palette = "limited",
+                                closeOnClick = T),
       
       actionButton("confirm_icons","Add"),
       actionButton("clear_custom_icons","Remove all")
@@ -278,6 +281,9 @@ server <- function(input, output,session) {
       updateRadioGroupButtons(session, "marker_icon", selected = selected_marker$icon)
       
     })
+    
+    #reset input to null
+    runjs('Shiny.setInputValue("edit_popup", null);')
     
   })
   
@@ -405,15 +411,45 @@ server <- function(input, output,session) {
           lat = target_marker_coords()[2],
           label = label,
           icon = all_marker_icons()[[icoon]],
-          popup = paste0(actionButton("edit", "Edit", onclick = 'Shiny.onInputChange(\"edit_popup\", Math.random())'),
+          popup = paste0(div(id = "edit_remove",
+                             actionButton("edit", "Edit", onclick = 'Shiny.setInputValue(\"edit_popup\", 1)'),
+                             actionButton("remove", "Remove", onclick = 'Shiny.setInputValue(\"remove_popup\", 1)'),
+                           ),
                          popup_html), #include edit button and added content
           options = markerOptions(draggable = T)
         )
     }
   })
   
-  #when remove marker is clicked; remove marker
-  observeEvent(input$remove,{
+
+  #when remove marker is clicked in the popop; remove marker
+  observeEvent(input$remove_popup,{
+    print(input$remove_popup)
+    
+    if(!is.null(input$remove_popup) & !is.null(target_marker_coords())){
+      #remove marker from mymap
+      mymap <- map_reactive() %>% 
+        clearGroup(target_marker_group())
+      
+      map_reactive(mymap)
+      
+      #remover marker from proxy
+      proxy <- leafletProxy("mymap")
+      proxy %>%
+        clearGroup(target_marker_group())
+      
+      #update df_markers and remove marker row
+      df_markers(df_markers()[df_markers()$group != target_marker_group(),])
+      
+      #set input$remove_popup to NULL
+      runjs('Shiny.setInputValue("remove_popup", null);')
+    }
+  
+      
+  })
+  
+  #when remove marker is clicked in edit menu; remove marker
+  observeEvent(input$remove, {
     
     if(!is.null(target_marker_coords())){
       
@@ -432,8 +468,7 @@ server <- function(input, output,session) {
       df_markers(df_markers()[df_markers()$group != target_marker_group(),])
       
       removeModal() #close marker input modal
-    }
-    
+    } 
   })
 
 # icon customization ------------------------------------------------------
@@ -608,7 +643,6 @@ server <- function(input, output,session) {
     ))
   })
   
-
 # load from .Rdata --------------------------------------------------------
 
   #when an R.data file is uploaded
@@ -683,9 +717,10 @@ server <- function(input, output,session) {
             label = label,
             icon = all_marker_icons()[[df_markers()$icon[i]]],
             popup = HTML(paste0(
-              actionButton("edit",
-                           "Edit",
-                           onclick = 'Shiny.onInputChange(\"edit_popup\", Math.random())'),#edit button. mathrandom to trigger oninputchange each time
+              div(id = "edit_remove",
+                  actionButton("edit", "Edit", onclick = 'Shiny.setInputValue(\"edit_popup\", 1)'),
+                  actionButton("remove", "Remove", onclick = 'Shiny.setInputValue(\"remove_popup\", 1)')
+              ),
               popup_content)),
             options = markerOptions(draggable = T)
           )
@@ -694,6 +729,7 @@ server <- function(input, output,session) {
       showNotification("Invalid .Rdata file")
     }
   })
-
   
 }
+
+
