@@ -766,23 +766,68 @@ server <- function(input, output,session) {
     
   })  
   
-  #When a polygon is being drawn
-  observeEvent(input$mymap_draw_start,{
+  #When a polygon is being drawn or edited
+  observeEvent(c(input$mymap_draw_start,input$mymap_draw_editstart),{
     
     drawing(TRUE)
-    print("START")
     
   })
   
+  #modal for editing features of polygon 'district'
+  edit_district <-  modalDialog(
+    
+    textInput("district_name","District name"),
+    actionButton("confirm_district","Confirm district"),
+    easyClose = T
+  )
+
+  
+  #When finished drawing
   observeEvent(input$mymap_draw_new_feature,{
+    
     drawing(FALSE)
-    print("EIND")
+    
+    new_feature <- input$mymap_draw_new_feature
+    # Extract coordinates from the drawn feature (assuming it's a polygon)
+    coords <- new_feature$geometry$coordinates[[1]]  # Assuming only one polygon is drawn
+    
+    # Convert to a matrix of longitudes and latitudes
+    latlngs <- do.call(rbind, lapply(coords, function(x) c(x[2], x[1])))
+    
+    
+
+#    showModal(edit_district) #show edit district modal
+
+  print(new_feature$features[[1]]$properties$`_leaflet_id`)
+
+    leafletProxy("mymap") %>% 
+      addPolygons(lng = latlngs[, 2] %>% unlist(),
+                  lat = latlngs[, 1] %>% unlist(),
+                  fillColor = "green",
+                  group = new_feature$features[[1]]$properties$`_leaflet_id`,
+                  color = "black", weight = 2)
+    
+    #TGODO Write to reactive()
+    
   })
   
+  #when finished editing
+  observeEvent(input$mymap_draw_edited_features,{
+
+    #todo; reactive DF that tracks all polygons that are supposed to be there
+    #remove old version of edited polygon from proxy
+    
+    #remove from mymap reactive
+    
+    #add new version to proxy
+    #add new version to mymap reactive
+    
+        
+    drawing(FALSE)
+    showModal(edit_district) #show edit district modal
+    print(input$mymap_draw_edited_features)
+    
+  })
+  
+  
 }
-
-
-
-
-
-
