@@ -7,11 +7,14 @@ library(leaflet.extras)
 library(stringr)
 library(htmlwidgets)
 library(glue)
-library(png)
+#library(png)
+library(purrr)
+library(tidyr)
 library(dplyr)
 library(shinycssloaders)
 library(shinyjs)
 library(colourpicker)
+library(sf)
 
 
 
