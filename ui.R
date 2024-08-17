@@ -13,6 +13,9 @@ ui <- dashboardPage(
     #triggers modal for exporting map as .html
     actionButton("export","Export map as html"),
     
+    #triggers tool for drawing polylines / polygons.
+    actionButton("draw_toolbaar","Draw Polyline / Polygon"),
+    
     #fileinput for loading map from Rdata
     fileInput("map_file", "Load saved map from Rdata",accept = ".Rdata"),
     

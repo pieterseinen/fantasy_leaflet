@@ -141,6 +141,9 @@ server <- function(input, output,session) {
   #when the map is clicked, create a new marker   
   observeEvent(input$mymap_click, {
     
+    #only when not drawing polygons
+    req(!drawing())
+
     #save input and marker coordinates
     click <- input$mymap_click
     marker = c(click$lng,click$lat)
@@ -730,6 +733,56 @@ server <- function(input, output,session) {
     }
   })
   
+
+  # draw polygons -----------------------------------------------------------
+  show_toolbar <- reactiveVal(FALSE) #Toggle toolbar for drawing polygons
+  drawing <- reactiveVal(FALSE) #monitor wheter a polygon is being drawn
+  
+  
+  #When the toggle button for the toolbar is clicked.
+  observeEvent(input$draw_toolbaar,{
+    
+    #If show_toolbar was true: remove toolbar 
+    if(show_toolbar()){
+      leafletProxy("mymap") %>%
+        removeDrawToolbar()
+      
+      show_toolbar(FALSE)
+    } else {
+      #show toolbar
+      leafletProxy("mymap") %>% addDrawToolbar(
+        targetGroup = "drawn", 
+        polylineOptions = drawPolylineOptions(shapeOptions = drawShapeOptions()),
+        polygonOptions = drawPolygonOptions(shapeOptions = drawShapeOptions()),
+        circleOptions = FALSE, 
+        rectangleOptions = FALSE, 
+        markerOptions = FALSE, 
+        editOptions = editToolbarOptions()
+      )
+      
+      show_toolbar(TRUE)
+      
+    }
+    
+  })  
+  
+  #When a polygon is being drawn
+  observeEvent(input$mymap_draw_start,{
+    
+    drawing(TRUE)
+    print("START")
+    
+  })
+  
+  observeEvent(input$mymap_draw_new_feature,{
+    drawing(FALSE)
+    print("EIND")
+  })
+  
 }
+
+
+
+
 
 
