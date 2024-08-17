@@ -816,7 +816,7 @@ server <- function(input, output,session) {
     
     # Convert to a matrix of longitudes and latitudes
     latlngs <- do.call(rbind, lapply(coords, function(x) c(x[2], x[1])))
-    
+
     id <- new_feature$properties$`_leaflet_id`
     lng <- latlngs[, 2] %>% unlist()
     lat <- latlngs[, 1] %>% unlist()
@@ -860,7 +860,20 @@ server <- function(input, output,session) {
                   color = "black", weight = 2)
     
     map_reactive(mymap)
+
+
+#    showModal(edit_district) #show edit district modal
+
+  print(new_feature$features[[1]]$properties$`_leaflet_id`)
+
+    leafletProxy("mymap") %>% 
+      addPolygons(lng = latlngs[, 2] %>% unlist(),
+                  lat = latlngs[, 1] %>% unlist(),
+                  fillColor = "green",
+                  group = new_feature$features[[1]]$properties$`_leaflet_id`,
+                  color = "black", weight = 2)
     
+
     #TGODO Write to reactive()
     
   })
@@ -930,6 +943,20 @@ server <- function(input, output,session) {
         
     drawing(FALSE)
     showModal(edit_district) #show edit district modal
+
+
+    #todo; reactive DF that tracks all polygons that are supposed to be there
+    #remove old version of edited polygon from proxy
+    
+    #remove from mymap reactive
+    
+    #add new version to proxy
+    #add new version to mymap reactive
+    
+        
+    drawing(FALSE)
+    showModal(edit_district) #show edit district modal
+    print(input$mymap_draw_edited_features)
 
     
   })
