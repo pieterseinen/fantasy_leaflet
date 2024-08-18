@@ -82,7 +82,7 @@ maak_custom_marker_icons <- function(icons, color){
     iconlist_names <- paste0(icon_name,color)
     
     names(iconlist) <- iconlist_names
-
+    
     iconlist
     
   }) %>% do.call(c,.)
@@ -92,8 +92,8 @@ maak_custom_marker_icons <- function(icons, color){
 #js that adds an image to the leaflet map and maintains aspect ratio
 #by calculation image bounds based in input image dimensions w correction for curvature of the earth.
 js_leaflet_background_image <- function(image_src,image_dimensions){
-
-glue::glue("
+  
+  glue::glue("
           
           function(el, x) {{
             
@@ -144,4 +144,33 @@ glue::glue("
           // Adjust the map view to fit the image bounds
           myMap.fitBounds(imageBounds);
           }}")
+}
+
+#function that turns a drawn or edited polygon into a sf dataframe
+drawn_polygon_to_sf <- function(x){
+  
+  if(x$type == "FeatureCollection"){
+    
+    x <- x$features[[1]]
+  }
+  
+  coords <- x$geometry$coordinates[[1]]  # Assuming only one polygon is drawn
+  id = x$properties$`_leaflet_id`
+  # Convert coords to a matrix of longitudes and latitudes
+  latlngs <- do.call(rbind, lapply(coords, function(x) c(x[2], x[1])))
+  
+  lng <- latlngs[, 2] %>% unlist()
+  lat <- latlngs[, 1] %>% unlist()
+  
+  data.frame(
+    "id" = id,
+    "lng" = lng,
+    "lat" = lat) %>%
+    group_by(id) %>%                                    # Group by polygon ID
+    nest() %>%                                          # Nest the lng/lat pairs within each group
+    mutate(geometry = map(data, ~ st_polygon(list(as.matrix(.x))))) %>%  # Convert each group to a polygon
+    select(id, geometry) %>%                            # Select only the relevant columns
+    st_as_sf()
+  
+  
 }

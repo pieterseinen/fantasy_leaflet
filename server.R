@@ -116,7 +116,8 @@ server <- function(input, output,session) {
           
           #js function that gets image dimensions from the client and converts these to
           #image bounds for the leaflet map.
-          htmlwidgets::onRender(js_leaflet_background_image(image_src, image_dimensions))
+          htmlwidgets::onRender(js_leaflet_background_image(image_src, image_dimensions)) %>%
+          htmlwidgets::onRender(js_style_change)
         
         map_reactive(mymap)
         mymap
@@ -438,7 +439,6 @@ server <- function(input, output,session) {
 
   #when remove marker is clicked in the popop; remove marker
   observeEvent(input$remove_popup,{
-    print(input$remove_popup)
     
     if(!is.null(input$remove_popup) & !is.null(target_marker_coords())){
       #remove marker from mymap
@@ -750,13 +750,7 @@ server <- function(input, output,session) {
   drawing <- reactiveVal(FALSE) #monitor wheter a polygon is being drawn
   
   #reactiveVal df for saving polygon data
-  df_polygons <- reactiveVal(
-    data.frame(    
-      id = character(),
-      lng = numeric(),
-      lat = numeric(),
-      stringsAsFactors = FALSE
-      ))
+  polygons <- reactiveVal()
   
   
   #When the toggle button for the toolbar is clicked.
@@ -770,18 +764,29 @@ server <- function(input, output,session) {
       show_toolbar(FALSE)
     } else {
       #show toolbar
-      leafletProxy("mymap") %>% addDrawToolbar(
-        targetGroup = "drawn", 
-        polygonOptions = drawPolygonOptions(shapeOptions = drawShapeOptions()),
-        polylineOptions = FALSE,
-        circleOptions = FALSE, 
-        rectangleOptions = FALSE, 
-        markerOptions = FALSE, 
-        circleMarkerOptions = FALSE,
-        editOptions = editToolbarOptions(),
-        drag = TRUE
-      ) %>% 
-        addStyleEditor()
+      leafletProxy("mymap") %>% 
+        addDrawToolbar(
+          targetGroup = 'drawn',
+          polylineOptions = FALSE,
+          polygonOptions = TRUE,
+          circleOptions = FALSE,
+          rectangleOptions = FALSE,
+          markerOptions = FALSE,
+          circleMarkerOptions = FALSE,
+          editOptions = editToolbarOptions(selectedPathOptions = selectedPathOptions())
+        ) %>%
+        addStyleEditor(
+          openOnLeafletDraw = TRUE,
+          forms = list(
+            geometry = list(
+              color = TRUE,         # Show color picker
+              opacity = FALSE,       # Hide opacity slider
+              weight = FALSE,        # Hide weight slider
+              dashArray = FALSE,      # Hide dash array picker
+              popupContent = TRUE #show label input
+            )
+          )
+        )
       
       show_toolbar(TRUE)
       
@@ -804,162 +809,35 @@ server <- function(input, output,session) {
     easyClose = T
   )
 
-  
   #When finished drawing
   observeEvent(input$mymap_draw_new_feature,{
     
-    drawing(FALSE)
+    new_polygon <- drawn_polygon_to_sf(input$mymap_draw_new_feature)
     
-    new_feature <- input$mymap_draw_new_feature
-    # Extract coordinates from the drawn feature (assuming it's a polygon)
-    coords <- new_feature$geometry$coordinates[[1]]  # Assuming only one polygon is drawn
+    all_polygons <- polygons() %>% rbind(new_polygon)
     
-    # Convert to a matrix of longitudes and latitudes
-    latlngs <- do.call(rbind, lapply(coords, function(x) c(x[2], x[1])))
+    polygons(all_polygons)
 
-    id <- new_feature$properties$`_leaflet_id`
-    lng <- latlngs[, 2] %>% unlist()
-    lat <- latlngs[, 1] %>% unlist()
-    
-    new_polygon_data <- data.frame(
-      "id" = id,
-      "lng" = lng,
-      "lat" = lat
-    )
-
-    df_polygons(rbind(df_polygons(),new_polygon_data))
-
-    showModal(edit_district) #show edit district modal
-    
-    sf_polygons <- df_polygons() %>%
-      group_by(id) %>%                                    # Group by polygon ID
-      nest() %>%                                          # Nest the lng/lat pairs within each group
-      mutate(geometry = map(data, ~ st_polygon(list(as.matrix(.x))))) %>%  # Convert each group to a polygon
-      select(id, geometry) %>%                            # Select only the relevant columns
-      st_as_sf()                                          # Convert to sf object
-    
-    print(sf_polygons)
-    
-    #add polygons to proxy
-    leafletProxy("mymap") %>% 
-      clearGroup(group = "districts") %>% 
-      addPolygons(data = sf_polygons,
-                  fillColor = ~id,
-                  group = "districts",
-                  layerId = ~id,
-                  color = "black", weight = 2)
-    
-    #add polygons to mymap reactive
-    #remove marker from mymap
-    mymap <- map_reactive() %>% 
-      clearGroup(group = "districts") %>% 
-      addPolygons(data = sf_polygons,
-                  fillColor = ~id,
-                  group = "districts",
-                  layerId = ~id,
-                  color = "black", weight = 2)
-    
-    map_reactive(mymap)
-
-
-#    showModal(edit_district) #show edit district modal
-
-  print(new_feature$features[[1]]$properties$`_leaflet_id`)
-
-    leafletProxy("mymap") %>% 
-      addPolygons(lng = latlngs[, 2] %>% unlist(),
-                  lat = latlngs[, 1] %>% unlist(),
-                  fillColor = "green",
-                  group = new_feature$features[[1]]$properties$`_leaflet_id`,
-                  color = "black", weight = 2)
-    
-
-    #TGODO Write to reactive()
-    
   })
-  
+
   #when finished editing
   observeEvent(input$mymap_draw_edited_features,{
-
     
-    edited_feature <- input$mymap_draw_edited_features
-   # print(edited_feature)
+    new_polygon <- drawn_polygon_to_sf(input$mymap_draw_edited_features)
     
-    # Extract coordinates from the drawn feature (assuming it's a polygon)
-    coords <- edited_feature$features[[1]]$geometry$coordinates[[1]] # Assuming only one polygon is drawn
+    polygon_id <- new_polygon$id %>% unique()
     
-
-    # Convert to a matrix of longitudes and latitudes
-    latlngs <- do.call(rbind, lapply(coords, function(x) c(x[2], x[1])))
+    all_polygons <- polygons() %>% 
+      filter(id != polygon_id) %>% 
+      rbind(new_polygon)
     
-    id <- edited_feature$features[[1]]$properties$`_leaflet_id`
-    lng <- latlngs[, 2] %>% unlist()
-    lat <- latlngs[, 1] %>% unlist()
-    
-    new_polygon_data <- data.frame(
-      "id" = id,
-      "lng" = lng,
-      "lat" = lat
-    )
+    polygons(all_polygons)
 
 
-    #remove old polygon from df_polygons and add new polygon data
-    df_polygons(
-      rbind(
-        df_polygons() %>% filter(id != unique(new_polygon_data$id)),
-        new_polygon_data
-        )
-      )
-
-
-    sf_polygons <- df_polygons() %>%
-      group_by(id) %>%                                    # Group by polygon ID
-      nest() %>%                                          # Nest the lng/lat pairs within each group
-      mutate(geometry = map(data, ~ st_polygon(list(as.matrix(.x))))) %>%  # Convert each group to a polygon
-      select(id, geometry) %>%                            # Select only the relevant columns
-      st_as_sf()                                          # Convert to sf object
-    
-      
-    #add edited polygons to proxy
-    leafletProxy("mymap") %>%
-      clearGroup(group = "districts") %>% 
-      addPolygons(data = sf_polygons,
-                  fillColor = ~id,
-                  layerId = ~id,
-                  group = "districts",
-                  color = "black", weight = 2)
-    
-    #add edited polygons to mymap reactive
-    mymap <- map_reactive() %>%
-      clearGroup(group = "districts") %>% 
-      addPolygons(data = sf_polygons,
-                  fillColor = ~id,
-                  layerId = ~id,
-                  group = "districts",
-                  color = "black", weight = 2)
-    
-    map_reactive(mymap)
-      
-        
-    drawing(FALSE)
-    showModal(edit_district) #show edit district modal
-
-
-    #todo; reactive DF that tracks all polygons that are supposed to be there
-    #remove old version of edited polygon from proxy
-    
-    #remove from mymap reactive
-    
-    #add new version to proxy
-    #add new version to mymap reactive
-    
-        
-    drawing(FALSE)
-    showModal(edit_district) #show edit district modal
-    print(input$mymap_draw_edited_features)
-
-    
   })
   
+  observeEvent(input$mymap_styleeditor_changed,{
+    print("A")
+  })
   
 }
