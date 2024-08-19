@@ -116,7 +116,7 @@ server <- function(input, output,session) {
           
           #js function that gets image dimensions from the client and converts these to
           #image bounds for the leaflet map.
-          htmlwidgets::onRender(js_leaflet_background_image(image_src, image_dimensions))
+          htmlwidgets::onRender(js_leaflet_background_image(image_src, image_dimensions)) 
         
         map_reactive(mymap)
         mymap
@@ -153,7 +153,7 @@ server <- function(input, output,session) {
   observeEvent(input$mymap_click, {
     
     #only when not drawing polygons
-    req(!drawing())
+    req(!input$drawing)
 
     #save input and marker coordinates
     click <- input$mymap_click
@@ -566,9 +566,11 @@ server <- function(input, output,session) {
         saved_img_dimensions <- img_dimensions()
         saved_custom_icons <- all_marker_icons()
         saved_custom_marker_icons_values <- custom_marker_icons_values()
+        saved_polygons <- polygons()
         
         save(mymap, saved_img_src, saved_df_markers, saved_img_dimensions, 
-             saved_custom_icons, saved_custom_marker_icons_values, file = file)
+             saved_custom_icons, saved_custom_marker_icons_values,
+             saved_polygons, file = file)
         
         
       }
@@ -593,7 +595,11 @@ server <- function(input, output,session) {
     #downloadbutton
     output$downloadHtml <- downloadHandler(
       filename = function() {
-        paste0(img_name(), ".html")
+        name <- img_name()
+        if (is.null(name) || name == "") {
+          stop("img_name() returned NULL or an empty string")
+        }
+        paste0(name, ".html")
       },
       content = function(file) {
         
@@ -688,7 +694,8 @@ server <- function(input, output,session) {
     
     # Check that necessary variables exist
     if (exists("mymap") && exists("saved_img_src") && exists("saved_df_markers") && exists("saved_img_dimensions") && 
-        exists("saved_custom_icons") && exists("saved_custom_marker_icons_values")) {
+        exists("saved_custom_icons") && exists("saved_custom_marker_icons_values") &&
+        exists("saved_polygons")) {
       
       #append custom_icons
       custom_marker_icons_values(c(custom_marker_icons_values(),saved_custom_marker_icons_values))
@@ -700,6 +707,7 @@ server <- function(input, output,session) {
       img_name(str_extract(saved_img_src, "[^/]*(?=\\.[:alpha:]*$)"))
       df_markers(saved_df_markers)
       img_dimensions(saved_img_dimensions)
+      polygons(saved_polygons)
       
       #render map with image
       output$mymap <- renderLeaflet({
@@ -710,7 +718,29 @@ server <- function(input, output,session) {
       })
       
       #add markers to leafletProxy
-      proxy <- leafletProxy("mymap")
+      proxy <- leafletProxy("mymap") %>%
+        addPolygons(
+          data = polygons(),
+          fillColor = ~color,
+          color = ~color,
+          group = "districts"
+        ) %>%
+        addLabelOnlyMarkers(
+          data = polygons(),
+          lng = ~lon,
+          lat = ~lat,
+          label = ~label,
+          group = "districts",
+          labelOptions = district_labels
+        ) %>% 
+        addLayersControl(
+          overlayGroups = c("districts"),
+          options = layersControlOptions(collapsed = FALSE)
+        )
+      
+      #polygons from loaded Rdata do not exist in the drawToolbar plugin.
+      #It must be possible to at least delete them: for now when clicking clear all polygons or when deleting a new drawn polygon
+      loaded_polygon_ids(polygons()$id)
       
       for (i in 1:nrow(df_markers())) {
         
@@ -736,7 +766,7 @@ server <- function(input, output,session) {
               ),
               popup_content)),
             options = markerOptions(draggable = T)
-          )
+          ) 
       }
     } else {
       showNotification("Invalid .Rdata file")
@@ -744,23 +774,22 @@ server <- function(input, output,session) {
   })
   
 
-  # draw polygons -----------------------------------------------------------
-  show_toolbar <- reactiveVal(FALSE) #Toggle toolbar for drawing polygons
-  drawing <- reactiveVal(FALSE) #monitor wheter a polygon is being drawn
-  
+# draw polygons -----------------------------------------------------------
+
   #reactiveVal df for saving polygon data
   polygons <- reactiveVal()
   
+  loaded_polygon_ids <- reactiveVal()
   
-  #When the toggle button for the toolbar is clicked.
-  observeEvent(input$draw_toolbar,{
-    
-    #If show_toolbar was true: remove toolbar 
-    if(show_toolbar()){
-      leafletProxy("mymap") %>%
-        removeDrawToolbar()
+  #When the switch button for toolbar is clicked.
+  observeEvent(input$drawing,{
       
-      show_toolbar(FALSE)
+    #remove toolbar if !drawing    
+    if(!input$drawing){
+      leafletProxy("mymap") %>%
+        removeDrawToolbar() %>% 
+        removeStyleEditor()
+      
     } else {
       #show toolbar
       leafletProxy("mymap") %>% 
@@ -787,26 +816,10 @@ server <- function(input, output,session) {
           )
         )
       
-      show_toolbar(TRUE)
-      
     }
     
   })  
   
-  #When a polygon is being drawn or edited
-  observeEvent(c(input$mymap_draw_start,input$mymap_draw_editstart),{
-    
-    drawing(TRUE)
-    
-  })
-  
-  #modal for editing features of polygon 'district'
-  edit_district <-  modalDialog(
-    
-    textInput("district_name","District name"),
-    actionButton("confirm_district","Confirm district"),
-    easyClose = T
-  )
 
   #When finished drawing
   observeEvent(input$mymap_draw_new_feature,{
@@ -836,10 +849,107 @@ server <- function(input, output,session) {
   })
   
   
-  observeEvent(c(input$styleeditor_change$color,input$styleeditor_change$popup),{
-    print(input$styleeditor_change)
+  observeEvent(input$styleeditor_change,{
+    #when a change in styleeditor is detected
+    #update color and label in polygons() reactive sf dataframe
     
-    #TODO append style data to sf-dataframe reactiveVal
+    poly_id = input$styleeditor_change$layerId
+    color = input$styleeditor_change$color
+    
+    label = ifelse(
+      is.null(input$styleeditor_change$popup),
+      "",
+      input$styleeditor_change$popup
+      )
+    
+    all_polygons <- polygons()
+    
+    all_polygons$color[all_polygons$id == poly_id] <- color
+    all_polygons$label[all_polygons$id == poly_id] <- label
+
+    polygons(all_polygons)
+    
+  })
+  
+  observeEvent(input$confirm_districts,{
+    
+    req(polygons())
+
+    proxy <- leafletProxy("mymap") %>% 
+      clearGroup("districts") %>% 
+      removeLayersControl()
+      
+    mymap <- map_reactive() %>% 
+      clearGroup("districts") %>% 
+      removeLayersControl()
+    
+    map_reactive(mymap)
+    
+    if(nrow(polygons()) > 0){
+      
+      proxy <- proxy %>% 
+        addPolygons(
+          data = polygons(),
+          fillColor = ~color,
+          color = ~color,
+          group = "districts"
+        ) %>% 
+        addLabelOnlyMarkers(
+          data = polygons(),
+          lng = ~lon,
+          lat = ~lat,
+          label = ~label,
+          group = "districts",
+          labelOptions = district_labels
+        ) %>% 
+        addLayersControl(
+          overlayGroups = c("districts"),
+          options = layersControlOptions(collapsed = FALSE)
+        )
+      
+      mymap <- map_reactive() %>% 
+        addPolygons(
+          data = polygons(),
+          fillColor = ~color,
+          color = ~color,
+          group = "districts"
+        ) %>% 
+        addLabelOnlyMarkers(
+          data = polygons(),
+          lng = ~lon,
+          lat = ~lat,
+          label = ~label,
+          group = "districts",
+          labelOptions = district_labels
+        ) %>% 
+        addLayersControl(
+          overlayGroups = c("districts"),
+          options = layersControlOptions(collapsed = FALSE)
+        )
+      
+      map_reactive(mymap)
+      
+      
+    }
+    
+    proxy
+
+  })
+  
+  #When drawn polygons are deleted
+  observeEvent(input$draw_delete_event,{
+    req(polygons())
+    
+    if(nrow(polygons()) > 0){
+      
+      all_polygons <- polygons() %>% 
+        filter(!id %in% c(input$draw_delete_event,
+                          loaded_polygon_ids())) #delete the selected or all drawn polygons AND the loaded polygons
+      
+      polygons(all_polygons)
+      
+      
+    } 
   })
   
 }

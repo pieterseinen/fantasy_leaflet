@@ -13,8 +13,11 @@ ui <- dashboardPage(
     #triggers modal for exporting map as .html
     actionButton("export","Export map as html"),
     
-    #triggers tool for drawing polylines / polygons.
-    actionButton("draw_toolbar","Draw Polyline / Polygon"),
+    switchInput("drawing",
+                onLabel = "Draw Districts",
+                offLabel = "Add Markers"),
+    
+    actionButton("confirm_districts","Confirm Districts"),
 
     #fileinput for loading map from Rdata
     fileInput("map_file", "Load saved map from Rdata",accept = ".Rdata"),

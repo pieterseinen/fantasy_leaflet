@@ -148,33 +148,52 @@ js_leaflet_background_image <- function(image_src,image_dimensions){
           //
           
              // Listen for changes in the StyleEditor
-    myMap.on('styleeditor:changed', function(e) {{
-      console.log('StyleEditor change event:', e);
-      
-
-             // Extract relevant data to avoid circular references
-        var extractedData = {{
-          layerId: e.editing._poly.feature.properties._leaflet_id || null, // Assuming each layer has an 'id' option
-          color: e.editing._poly.options.color || null, // Capture the color change
-          popup:e.editing._poly._popup ? e.editing._poly._popup._content : null, // Capture popup
-        }};
-        
-        // Send the cleaned-up data back to R via Shiny
-        Shiny.setInputValue('styleeditor_change', extractedData);
-    }});
+          myMap.on('styleeditor:changed', function(e) {{
           
-          }}")
+          // Extract relevant data
+          var extractedData = {{
+            layerId: e.editing._poly.feature.properties._leaflet_id || null, // Assuming each layer has an 'id' option
+            color: e.editing._poly.options.color || null, // Capture the color change
+            popup:e.editing._poly._popup ? e.editing._poly._popup._content: null // Capture popup
+            }};
+        
+          // Send the cleaned-up data back to R via Shiny
+          Shiny.setInputValue('styleeditor_change', extractedData);
+          }});
+          
+          //Listen for deleting elements
+          myMap.on('draw:deleted', function(e) {{
+
+        
+          // Extract all _leaflet_id values from layers._layers
+          var deletedLayerIds = [];
+          for (var layerId in e.layers._layers) {{
+            if (e.layers._layers.hasOwnProperty(layerId)) {{
+              deletedLayerIds.push(e.layers._layers[layerId]._leaflet_id);
+            }}
+          }}
+
+          Shiny.setInputValue('draw_delete_event', deletedLayerIds);
+  
+          }})
+          
+        }}")
 }
 
+
+# 
+# Shiny.setInputValue('draw_delete_event', deletedLayers);
 #function that turns a drawn or edited polygon into a sf dataframe
 drawn_polygon_to_sf <- function(x){
   
+  #an edited polygon is saved as featurecollection
+  #id and coordinates are nested further in the list
   if(x$type == "FeatureCollection"){
     
     x <- x$features[[1]]
   }
   
-  coords <- x$geometry$coordinates[[1]]  # Assuming only one polygon is drawn
+  coords <- x$geometry$coordinates[[1]]
   id = x$properties$`_leaflet_id`
   # Convert coords to a matrix of longitudes and latitudes
   latlngs <- do.call(rbind, lapply(coords, function(x) c(x[2], x[1])))
@@ -190,7 +209,34 @@ drawn_polygon_to_sf <- function(x){
     nest() %>%                                          # Nest the lng/lat pairs within each group
     mutate(geometry = map(data, ~ st_polygon(list(as.matrix(.x))))) %>%  # Convert each group to a polygon
     select(id, geometry) %>%                            # Select only the relevant columns
-    st_as_sf()
+    st_as_sf() %>% 
+    mutate(
+      color = "",
+      label = "",
+      centroid = st_centroid(geometry), 
+      lon = st_coordinates(centroid)[, 1],
+      lat = st_coordinates(centroid)[, 2] #get centroid coordinates for labels
+    ) %>%
+    select(-centroid)
   
   
 }
+
+
+district_labels <-   labelOptions(
+  noHide = TRUE, 
+  direction = 'center',  # Set to 'auto' so that the direction arrow is not shown
+  textOnly = FALSE,  
+  style = list(
+    "color" = "black",  # Text color, gives it an aged look
+    "background-color" = "#f5deb3",  # Light brown, similar to old paper
+    "border" = "2px solid #8b4513",  # Darker brown for a worn-out border
+    "padding" = "10px",  # Padding to give the text some space
+    "border-radius" = "8px",  # Slightly rounded corners
+    "box-shadow" = "4px 4px rgba(0,0,0,0.5)",  # Adds a shadow to create depth
+    "font-family" = "'Book Antiqua', serif",  #
+    "font-size" = "16px",  # Adjust font size for readability
+    "text-align" = "center",  # Center the text within the box
+    "opacity" = "0.9"  # Slightly transparent to give it a worn look
+  )
+)
