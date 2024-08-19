@@ -143,6 +143,26 @@ js_leaflet_background_image <- function(image_src,image_dimensions){
           
           // Adjust the map view to fit the image bounds
           myMap.fitBounds(imageBounds);
+          
+          
+          //
+          
+             // Listen for changes in the StyleEditor
+    myMap.on('styleeditor:changed', function(e) {{
+      console.log('StyleEditor change event:', e);
+      
+
+             // Extract relevant data to avoid circular references
+        var extractedData = {{
+          layerId: e.editing._poly.feature.properties._leaflet_id || null, // Assuming each layer has an 'id' option
+          color: e.editing._poly.options.color || null, // Capture the color change
+          popup:e.editing._poly._popup ? e.editing._poly._popup._content : null, // Capture popup
+        }};
+        
+        // Send the cleaned-up data back to R via Shiny
+        Shiny.setInputValue('styleeditor_change', extractedData);
+    }});
+          
           }}")
 }
 

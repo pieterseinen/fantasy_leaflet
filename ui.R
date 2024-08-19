@@ -14,8 +14,8 @@ ui <- dashboardPage(
     actionButton("export","Export map as html"),
     
     #triggers tool for drawing polylines / polygons.
-    actionButton("draw_toolbaar","Draw Polyline / Polygon"),
-    
+    actionButton("draw_toolbar","Draw Polyline / Polygon"),
+
     #fileinput for loading map from Rdata
     fileInput("map_file", "Load saved map from Rdata",accept = ".Rdata"),
     
@@ -61,6 +61,7 @@ ui <- dashboardPage(
       }
     });
     ")),
+    
     
     #leafletmap output
     leafletOutput("mymap", width = "100%", height = "100vh") %>%

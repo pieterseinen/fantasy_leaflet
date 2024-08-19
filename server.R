@@ -116,8 +116,7 @@ server <- function(input, output,session) {
           
           #js function that gets image dimensions from the client and converts these to
           #image bounds for the leaflet map.
-          htmlwidgets::onRender(js_leaflet_background_image(image_src, image_dimensions)) %>%
-          htmlwidgets::onRender(js_style_change)
+          htmlwidgets::onRender(js_leaflet_background_image(image_src, image_dimensions))
         
         map_reactive(mymap)
         mymap
@@ -754,7 +753,7 @@ server <- function(input, output,session) {
   
   
   #When the toggle button for the toolbar is clicked.
-  observeEvent(input$draw_toolbaar,{
+  observeEvent(input$draw_toolbar,{
     
     #If show_toolbar was true: remove toolbar 
     if(show_toolbar()){
@@ -836,8 +835,11 @@ server <- function(input, output,session) {
 
   })
   
-  observeEvent(input$mymap_styleeditor_changed,{
-    print("A")
+  
+  observeEvent(c(input$styleeditor_change$color,input$styleeditor_change$popup),{
+    print(input$styleeditor_change)
+    
+    #TODO append style data to sf-dataframe reactiveVal
   })
   
 }
