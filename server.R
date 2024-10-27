@@ -610,7 +610,7 @@ server <- function(input, output,session) {
         custom_css <- '
         <style>
         img.popup-image {
-          width: 50%;
+          min-width: 50%;
           height: 100%;
           margin-right: 10px;
           object-fit: cover;
